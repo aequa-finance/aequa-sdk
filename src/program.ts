@@ -23,6 +23,9 @@ export type Plain<T> = T extends BN
         ? { [K in keyof T]: Plain<T[K]> }
         : T;
 
+/** A value with bigints as Anchor's `BN`s, recursively: what Anchor encodes. */
+export type Anchored<T> = T extends bigint ? BN : T extends PublicKey | Uint8Array ? T : T extends readonly (infer U)[] ? Anchored<U>[] : T extends object ? { [K in keyof T]: Anchored<T[K]> } : T;
+
 const isKey = (v: object): v is PublicKey => v instanceof PublicKey || typeof (v as { toBase58?: unknown }).toBase58 === "function";
 
 export function plain<T>(v: T): Plain<T> {
@@ -30,6 +33,13 @@ export function plain<T>(v: T): Plain<T> {
   if (v === null || typeof v !== "object" || v instanceof Uint8Array || isKey(v)) return v as Plain<T>;
   if (Array.isArray(v)) return v.map(plain) as Plain<T>;
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, plain(x)])) as Plain<T>;
+}
+
+export function anchored<T>(v: T): Anchored<T> {
+  if (typeof v === "bigint") return new BN(v.toString()) as Anchored<T>;
+  if (v === null || typeof v !== "object" || v instanceof Uint8Array || isKey(v)) return v as Anchored<T>;
+  if (Array.isArray(v)) return v.map(anchored) as Anchored<T>;
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, anchored(x)])) as Anchored<T>;
 }
 
 type A = IdlAccounts<Aequa>;
@@ -47,6 +57,12 @@ export type Params = Plain<T["params"]>;
 export type Bucket = Plain<T["bucket"]>;
 export type Vesting = Plain<T["vesting"]>;
 export type HedgeReport = Plain<T["hedgeReport"]>;
+export type InitializeArgs = Plain<T["initializeArgs"]>;
+export type ListingArgs = Plain<T["listingArgs"]>;
+export type BridgeArgs = Plain<T["bridgeArgs"]>;
+export type ReportArgs = Plain<T["reportArgs"]>;
+export type AequaArgs = Plain<T["aequaArgs"]>;
+export type TokenMetadataArgs = Plain<T["tokenMetadataArgs"]>;
 export type EventName = keyof IdlEvents<Aequa>;
 export type EventData<N extends EventName> = Plain<IdlEvents<Aequa>[N]>;
 
@@ -58,7 +74,7 @@ export function aequaProgram(connection?: Connection): AequaProgram {
 }
 
 let shared: AequaProgram | undefined;
-/** The client the decoders share. It never calls an RPC. */
+/** The client the builders and decoders share. It never calls an RPC. */
 export const program = () => (shared ??= aequaProgram());
 
 /** Decodes one of the program's accounts; throws on another account's discriminator. */
