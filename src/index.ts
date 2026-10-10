@@ -5,5 +5,6 @@ export * from "./pda.js";
 export * from "./program.js";
 export * from "./errors.js";
 export * from "./math.js";
+export * from "./pyth.js";
 export * from "./token.js";
 export * from "./state.js";

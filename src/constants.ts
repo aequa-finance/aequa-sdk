@@ -1,5 +1,5 @@
 // The addresses and numbers the program is built on: its id, the programs it calls and the
-// listed collateral. Values come from the program's source (constants.rs, state.rs).
+// listed collateral. Values come from the program's source (constants.rs, state.rs, pyth.rs).
 
 import { PublicKey } from "@solana/web3.js";
 
@@ -9,6 +9,8 @@ export const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss6
 export const TOKEN_2022_PROGRAM = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 export const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 export const SYSTEM_PROGRAM = new PublicKey("11111111111111111111111111111111");
+export const ED25519_PROGRAM = new PublicKey("Ed25519SigVerify111111111111111111111111111");
+export const INSTRUCTIONS_SYSVAR = new PublicKey("Sysvar1nstructions1111111111111111111111111");
 export const CLOCK_SYSVAR = new PublicKey("SysvarC1ock11111111111111111111111111111111");
 
 export const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
@@ -27,3 +29,15 @@ export const COLLATERAL = {
 } as const;
 export type XStock = keyof typeof COLLATERAL;
 export const XSTOCKS = Object.keys(COLLATERAL) as XStock[];
+
+/** Pyth Pro (Lazer) on Solana: the program, its storage of trusted signers, and its treasury. */
+export const PYTH = {
+  program: new PublicKey("pytd2yyk641x7ak7mkaasSJVXh6YYZnC7wTmtgAyxPt"),
+  storage: new PublicKey("3rdJbqfnagQ4yx9HXJViD4zc4xpiSqmFsKpPuSCQVyQL"),
+  treasury: new PublicKey("Gx4MBPb1vqZLJajZmsKLg8fGw9ErhoKsR8LeKcCKFyak"),
+  /** The program takes channels up to 200 ms (real time, 50 ms, 200 ms). */
+  channel: "fixed_rate@200ms",
+} as const;
+
+/** US equity sessions as Pyth Pro reports them; each indexes a collateral's `bandsBps`. */
+export const SESSION = { REGULAR: 0, PRE: 1, POST: 2, OVERNIGHT: 3, CLOSED: 4 } as const;
