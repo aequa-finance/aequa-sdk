@@ -53,14 +53,27 @@ export function landUsdc(): Promise<TransactionInstruction> {
     .instruction();
 }
 
+type AequaPriced = Partial<Priced> & { caller: PublicKey; aequa: AequaToken };
+
+const swapAccounts = (aequa: AequaToken) => ({
+  aequaMint: aequa.mint,
+  aequaTokenProgram: aequa.tokenProgram,
+  swapAuthority: PDA.swapAuthority,
+  transitUsdc: PDA.transitUsdc,
+  transitAequa: transit(aequa.mint, aequa.tokenProgram),
+  jupiterProgram: JUPITER_PROGRAM,
+});
+
+const message = (a: Partial<Priced>) => [bytes(a.message ?? new Uint8Array()), a.ed25519Index ?? 0] as const;
+
 /**
  * Spends `amount` of the protocol vault's USDq on AEQUA through Jupiter, within the TWAP bound:
  * half is burned, half streams to stAEQUA. `route` spends `amount` USDC from the USDC transit
  * account into the AEQUA one.
  */
-export function buyback(a: Partial<Priced> & { caller: PublicKey; aequa: AequaToken; amount: bigint; route: Route }): Promise<TransactionInstruction> {
+export function buyback(a: AequaPriced & { amount: bigint; route: Route }): Promise<TransactionInstruction> {
   return program()
-    .methods.buyback(bytes(a.message ?? new Uint8Array()), a.ed25519Index ?? 0, bn(a.amount), bytes(a.route.data))
+    .methods.buyback(...message(a), bn(a.amount), bytes(a.route.data))
     .accountsStrict({
       caller: a.caller,
       config: PDA.config,
@@ -72,14 +85,7 @@ export function buyback(a: Partial<Priced> & { caller: PublicKey; aequa: AequaTo
       buffer: PDA.buffer,
       aequaPoolVault: PDA.aequaPoolVault,
       tokenProgram: TOKEN_PROGRAM,
-      swap: {
-        aequaMint: a.aequa.mint,
-        aequaTokenProgram: a.aequa.tokenProgram,
-        swapAuthority: PDA.swapAuthority,
-        transitUsdc: PDA.transitUsdc,
-        transitAequa: transit(a.aequa.mint, a.aequa.tokenProgram),
-        jupiterProgram: JUPITER_PROGRAM,
-      },
+      swap: swapAccounts(a.aequa),
       pyth: pythAccounts(),
     })
     .remainingAccounts(a.route.accounts)
@@ -87,9 +93,9 @@ export function buyback(a: Partial<Priced> & { caller: PublicKey; aequa: AequaTo
 }
 
 /** After a held shortfall: burns the Reserve Fund's USDq, then moves stAEQUA to the slash sale. */
-export function coverDeficit(a: Partial<Priced> & { caller: PublicKey; aequa: AequaToken }): Promise<TransactionInstruction> {
+export function coverDeficit(a: AequaPriced): Promise<TransactionInstruction> {
   return program()
-    .methods.coverDeficit(bytes(a.message ?? new Uint8Array()), a.ed25519Index ?? 0)
+    .methods.coverDeficit(...message(a))
     .accountsStrict({
       caller: a.caller,
       config: PDA.config,
@@ -109,9 +115,9 @@ export function coverDeficit(a: Partial<Priced> & { caller: PublicKey; aequa: Ae
 }
 
 /** Sells `amount` slashed AEQUA for USDC through Jupiter, within the slash TWAP bound. */
-export function sellSlashed(a: Partial<Priced> & { caller: PublicKey; aequa: AequaToken; amount: bigint; route: Route }): Promise<TransactionInstruction> {
+export function sellSlashed(a: AequaPriced & { amount: bigint; route: Route }): Promise<TransactionInstruction> {
   return program()
-    .methods.sellSlashed(bytes(a.message ?? new Uint8Array()), a.ed25519Index ?? 0, bn(a.amount), bytes(a.route.data))
+    .methods.sellSlashed(...message(a), bn(a.amount), bytes(a.route.data))
     .accountsStrict({
       caller: a.caller,
       config: PDA.config,
@@ -124,14 +130,7 @@ export function sellSlashed(a: Partial<Priced> & { caller: PublicKey; aequa: Aeq
       buffer: PDA.buffer,
       reserveFund: PDA.reserveFund,
       tokenProgram: TOKEN_PROGRAM,
-      swap: {
-        aequaMint: a.aequa.mint,
-        aequaTokenProgram: a.aequa.tokenProgram,
-        swapAuthority: PDA.swapAuthority,
-        transitUsdc: PDA.transitUsdc,
-        transitAequa: transit(a.aequa.mint, a.aequa.tokenProgram),
-        jupiterProgram: JUPITER_PROGRAM,
-      },
+      swap: swapAccounts(a.aequa),
       pyth: pythAccounts(),
     })
     .remainingAccounts(a.route.accounts)
