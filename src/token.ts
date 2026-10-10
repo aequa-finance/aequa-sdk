@@ -2,6 +2,7 @@
 // (token2022.rs): an xStock mint's multiplier and the issuer's pause.
 
 import { MULT_ONE } from "./constants.js";
+import { multiplierE12 } from "./math.js";
 
 const view = (d: Uint8Array) => new DataView(d.buffer, d.byteOffset, d.byteLength);
 
@@ -23,12 +24,14 @@ export type MintInfo = {
   scaledUiAmount: { multiplier: number; next: number; effectiveAt: number } | null;
   /** The issuer has paused the mint (`IssuerPaused`). */
   paused: boolean;
+  /** False when the program would refuse the mint (`CollateralNotAdmissible`). */
+  admissible: boolean;
 };
 
 /** Reads a mint at `now` (unix seconds). */
 export function readMint(data: Uint8Array, now: number): MintInfo {
   const v = view(data);
-  const info: MintInfo = { decimals: data[44], supply: v.getBigUint64(36, true), multiplierE12: MULT_ONE, scaledUiAmount: null, paused: false };
+  const info: MintInfo = { decimals: data[44], supply: v.getBigUint64(36, true), multiplierE12: MULT_ONE, scaledUiAmount: null, paused: false, admissible: true };
   // Token-2022 extensions follow the account-type byte at 165, as type, length, value.
   for (let i = 166; data.length > 165 && i + 4 <= data.length; ) {
     const type = v.getUint16(i, true);
@@ -40,8 +43,9 @@ export function readMint(data: Uint8Array, now: number): MintInfo {
       const effectiveAt = Number(v.getBigInt64(at + 40, true));
       const next = v.getFloat64(at + 48, true);
       info.scaledUiAmount = { multiplier, next, effectiveAt };
-      // TODO round and range-check like math.rs multiplier_e12
-      info.multiplierE12 = BigInt(Math.round((now >= effectiveAt ? next : multiplier) * 1e12));
+      const m = multiplierE12(now >= effectiveAt ? next : multiplier);
+      if (m === null) info.admissible = false;
+      else info.multiplierE12 = m;
     } else if (type === EXT.pausable) info.paused = data[at + 32] !== 0;
     i = at + len;
   }

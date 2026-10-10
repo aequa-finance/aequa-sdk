@@ -1,8 +1,10 @@
 // The protocol's state in one read, and a wallet's positions in another. Each read also takes
-// Solana's clock, so what is derived from it is what the program would compute at that slot.
+// Solana's clock, so what is derived from it (buckets, vesting, windows) is what the program
+// would compute at that slot.
 
 import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
 import { CLOCK_SYSVAR, COLLATERAL, TOKEN_PROGRAM, USDC_MINT, XSTOCKS, type XStock } from "./constants.js";
+import { assetsFor, assetsForUp, bucketLevel, feeBps, hedgeLive, reportFresh, stakeState, supplyCap, vested, type StakeState } from "./math.js";
 import { aequaStake, ata, collateralPda, collateralVault, PDA, usdqCooldown } from "./pda.js";
 import { decodeAccount, type AequaPool, type AequaStake, type Collateral, type Config, type Reserve, type Twap, type UsdqCooldown, type UsdqVault } from "./program.js";
 import { mintSupply, readMint, tokenAmount, type MintInfo } from "./token.js";
@@ -159,3 +161,52 @@ export async function fetchPosition(connection: Connection, protocol: Protocol, 
     aequaStake: infos[2] ? decodeAccount("aequaStake", infos[2].data) : null,
   };
 }
+
+/* ── What the state says ─────────────────────────────────────── */
+
+/** USDq behind sUSDq at `now`: the vault's base and what has vested. */
+export const susdqAssets = (p: Protocol, now = p.now) => p.usdqVault.base + vested(p.usdqVault.vesting.amount, p.usdqVault.vesting.start, p.usdqVault.vesting.end, now);
+
+/** AEQUA behind stAEQUA at `now`. */
+export const aequaPoolAssets = (p: Protocol, now = p.now) => p.aequaPool.base + vested(p.aequaPool.stream.amount, p.aequaPool.stream.start, p.aequaPool.stream.end, now);
+
+/** A stAEQUA position's state: active, cooling, in its withdraw window, or empty. */
+export const positionState = (p: Protocol, stake: AequaStake, now = p.now): StakeState => stakeState(stake, now, p.config.params.aequaCooldownSecs);
+
+/** The mint and redeem fee for a holder of `stake`: lower tiers for active stAEQUA. */
+export function feeFor(p: Protocol, stake: AequaStake | null, now = p.now): number {
+  if (!stake || positionState(p, stake, now) !== "active") return p.config.params.baseFeeBps;
+  return feeBps(p.config, assetsForUp(stake.shares, aequaPoolAssets(p, now), p.aequaPool.totalShares));
+}
+
+/** The USDq supply ceiling the spot caps set. */
+export const usdqSupplyCap = (p: Protocol) => supplyCap(p.config);
+
+/** Whether a path is open (bits of `Config.paused`). */
+export const pathOpen = (p: Protocol, bits: number) => (p.config.paused & bits) === 0;
+
+/** The USDC mint capacity left at `now`: the hourly bucket, and the room under the supply ceiling. */
+export function usdcMintRoom(p: Protocol, now = p.now): bigint {
+  const bucket = bucketLevel(p.config.usdcBucket.available, p.config.usdcBucket.updatedAt, p.config.params.usdcHourlyCap, now);
+  const room = usdqSupplyCap(p) - p.usdqSupply;
+  return room < bucket ? (room > 0n ? room : 0n) : bucket;
+}
+
+/** A listing's hourly capacity left at `now`, in dollars: for its mint path and its redeem path. */
+export function collateralRoom(c: ListedCollateral, now: number) {
+  const cap = c.account.hourlyCap;
+  return {
+    mint: bucketLevel(c.account.mintBucket.available, c.account.mintBucket.updatedAt, cap, now),
+    redeem: bucketLevel(c.account.redeemBucket.available, c.account.redeemBucket.updatedAt, cap, now),
+  };
+}
+
+/** Whether the hedge report counts at `now`, and whether a listing's hedge is live (its xStock paths need both). */
+export const hedgeReportFresh = (p: Protocol, now = p.now) => reportFresh(p.reserve, now, p.config.params.reportFreshnessSecs);
+export const collateralHedgeLive = (p: Protocol, c: ListedCollateral, now = p.now) => hedgeLive(p.reserve, c.account.index, now, p.config.params.reportFreshnessSecs);
+
+/** sUSDq's rate: USDq per sUSDq at 1e6, at `now`. */
+export const susdqRate = (p: Protocol, now = p.now) => (p.susdqSupply === 0n ? 1_000_000n : assetsFor(1_000_000n, susdqAssets(p, now), p.susdqSupply));
+
+/** When the next `distribute` is due, unix seconds. */
+export const nextDistribution = (p: Protocol) => Number(p.reserve.lastDistribution) + p.config.params.distributionIntervalSecs;
