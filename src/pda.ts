@@ -3,7 +3,24 @@
 // program's data account and CCTP's accounts for a burn.
 
 import { PublicKey } from "@solana/web3.js";
-import { ATA_PROGRAM, BPF_LOADER_UPGRADEABLE, CCTP, PROGRAM_ID, TOKEN_2022_PROGRAM, TOKEN_METADATA_PROGRAM, TOKEN_PROGRAM, USDC_MINT } from "./constants.js";
+import {
+  ATA_PROGRAM,
+  BPF_LOADER_UPGRADEABLE,
+  CCTP,
+  COLLATERAL,
+  COMPUTE_BUDGET_PROGRAM,
+  ED25519_PROGRAM,
+  INSTRUCTIONS_SYSVAR,
+  JUPITER_PROGRAM,
+  PROGRAM_ID,
+  PYTH,
+  SYSTEM_PROGRAM,
+  TOKEN_2022_PROGRAM,
+  TOKEN_METADATA_PROGRAM,
+  TOKEN_PROGRAM,
+  USDC_MINT,
+  XSTOCKS,
+} from "./constants.js";
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 const find = (program: PublicKey, ...seeds: (string | PublicKey | Uint8Array)[]) =>
@@ -73,4 +90,33 @@ export function cctpBurnAccounts(owner: PublicKey = PDA.buffer) {
     localToken: find(tmm, "local_token", USDC_MINT),
     eventAuthority: find(tmm, "__event_authority"),
   };
+}
+
+/**
+ * Every address the program's transactions reuse: what its address lookup table holds.
+ * `collateral` is the listing (`Protocol.collateral`), the launch listing by default.
+ */
+export function lookupTableAddresses(collateral: { mint: PublicKey; tokenProgram: PublicKey }[] = XSTOCKS.map((x) => ({ mint: COLLATERAL[x].mint, tokenProgram: TOKEN_2022_PROGRAM }))): PublicKey[] {
+  const list = [
+    PROGRAM_ID,
+    ...Object.values(PDA),
+    USDC_MINT,
+    TOKEN_PROGRAM,
+    TOKEN_2022_PROGRAM,
+    ATA_PROGRAM,
+    SYSTEM_PROGRAM,
+    INSTRUCTIONS_SYSVAR,
+    ED25519_PROGRAM,
+    COMPUTE_BUDGET_PROGRAM,
+    PYTH.program,
+    PYTH.storage,
+    PYTH.treasury,
+    JUPITER_PROGRAM,
+    CCTP.messageTransmitter,
+    CCTP.tokenMessengerMinter,
+    ...Object.values(cctpBurnAccounts(PDA.buffer)),
+    ...collateral.flatMap(({ mint, tokenProgram }) => [mint, collateralPda(mint), collateralVault(mint), transit(mint, tokenProgram)]),
+  ];
+  const seen = new Set<string>();
+  return list.filter((k) => !seen.has(k.toBase58()) && !!seen.add(k.toBase58()));
 }
