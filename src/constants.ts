@@ -1,6 +1,6 @@
 // The addresses and numbers the program is built on: its id, the programs and accounts it
-// calls, and the listed collateral. Values come from the program's source (constants.rs,
-// state.rs, pyth.rs and the instructions).
+// calls, the listed collateral, and the fixed limits its instructions check. Values come from
+// the program's source (constants.rs, state.rs, pyth.rs and the instructions).
 
 import { PublicKey } from "@solana/web3.js";
 
@@ -36,6 +36,9 @@ export const COLLATERAL = {
 export type XStock = keyof typeof COLLATERAL;
 export const XSTOCKS = Object.keys(COLLATERAL) as XStock[];
 
+/** The symbol of a launch collateral mint, if it is one. */
+export const symbolOf = (mint: PublicKey): XStock | undefined => XSTOCKS.find((x) => COLLATERAL[x].mint.equals(mint));
+
 /** Pyth Pro (Lazer) on Solana: the program, its storage of trusted signers, and its treasury. */
 export const PYTH = {
   program: new PublicKey("pytd2yyk641x7ak7mkaasSJVXh6YYZnC7wTmtgAyxPt"),
@@ -45,11 +48,14 @@ export const PYTH = {
   channel: "fixed_rate@200ms",
 } as const;
 
-/** Circle CCTP V2: the programs `bridge_out` burns through. */
+/** Circle CCTP V2: the programs `bridge_out` burns through and the route to HyperCore. */
 export const CCTP = {
   tokenMessengerMinter: new PublicKey("CCTPV2vPZJS2u2BBsUoscuikbYjnpFmbFsvVuJdgUMQe"),
   messageTransmitter: new PublicKey("CCTPV2Sm4AdWt5296sk4P66VBZ7bEhcARwFaaS9YPbeC"),
+  solanaDomain: 5,
   hyperEvmDomain: 19,
+  /** Circle's CctpForwarder on HyperEVM: mints each burn and credits the hook's HyperCore account. */
+  forwarder: "0xb21D281DEdb17AE5B501F6AA8256fe38C4e45757",
 } as const;
 
 /** The paths the guardian can pause, as bits of `Config.paused` (state.rs `path`). */
@@ -77,3 +83,24 @@ export const PATH = {
 
 /** US equity sessions as Pyth Pro reports them; each indexes a collateral's `bandsBps`. */
 export const SESSION = { REGULAR: 0, PRE: 1, POST: 2, OVERNIGHT: 3, CLOSED: 4 } as const;
+
+/** Where a fee went, in `Minted` and `Redeemed` events. */
+export const FEE_TO = { RESERVE_FUND: 0, PROTOCOL: 1 } as const;
+
+/** Fixed limits the instructions check. */
+export const LIMITS = {
+  maxCollaterals: 8,
+  /** A stAEQUA position may withdraw for this long once its cooldown ends. */
+  aequaWindowSecs: 2 * 86_400,
+  /** The rolling window of the slash cap. */
+  slashWindowSecs: 30 * 86_400,
+  /** `distribute` takes a Pyth update within this of the hedge report's HyperCore time. */
+  pairingMs: 20_000,
+  /** A hedge report's HyperCore time may run at most this far ahead of Solana's clock. */
+  reportAheadMs: 60_000,
+  /** The AEQUA TWAP: its window, its newest observation's age, its samples, their spacing. */
+  twapWindowSecs: 1_800,
+  twapMaxAgeSecs: 300,
+  twapMinSamples: 10,
+  twapMinSpacingSecs: 30,
+} as const;

@@ -102,6 +102,27 @@ export function feedPrice(u: Update, feed: number, freshnessSecs: number): { pri
   return { priceE8: priceE8(f.price, f.exponent), session: f.session };
 }
 
+/** A feed's latest price whatever its session (a non-dollar quote asset's feed). */
+export function anyPrice(u: Update, feed: number): bigint {
+  const f = u.feeds.find((x) => x.id === feed) ?? fail("CollateralNotLive");
+  if (!f.hasPrice || !f.hasExponent) fail("InvalidPythPrice");
+  return priceE8(f.price, f.exponent);
+}
+
+/** Whether the program would price `feed` from this update at `now`. */
+export function isLive(u: Update, feed: number, now: number, freshnessSecs: number): boolean {
+  try {
+    requireFresh(u, now, freshnessSecs);
+    feedPrice(u, feed, freshnessSecs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A feed's price as a number, for display. */
+export const displayPrice = (f: FeedUpdate) => Number(f.price) * 10 ** f.exponent;
+
 /**
  * The ed25519 instruction that verifies an envelope carried as the first argument of the
  * instruction at `instructionIndex` (Anchor's 8-byte discriminator and 4-byte length put it at

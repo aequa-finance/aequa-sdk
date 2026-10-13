@@ -3,8 +3,8 @@
 // would compute at that slot.
 
 import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
-import { CLOCK_SYSVAR, COLLATERAL, TOKEN_PROGRAM, USDC_MINT, XSTOCKS, type XStock } from "./constants.js";
-import { assetsFor, assetsForUp, bucketLevel, feeBps, hedgeLive, reportFresh, stakeState, supplyCap, vested, type StakeState } from "./math.js";
+import { BPS, CLOCK_SYSVAR, COLLATERAL, symbolOf, TOKEN_PROGRAM, USDC_MINT, XSTOCKS, type XStock } from "./constants.js";
+import { assetsFor, assetsForUp, bucketLevel, distributionSplit, feeBps, hedgeLive, inFlight, reportFresh, reserveFundTarget, stakeState, supplyCap, vested, xstockValue, type StakeState } from "./math.js";
 import { aequaStake, ata, collateralPda, collateralVault, PDA, usdqCooldown } from "./pda.js";
 import { decodeAccount, type AequaPool, type AequaStake, type Collateral, type Config, type Reserve, type Twap, type UsdqCooldown, type UsdqVault } from "./program.js";
 import { mintSupply, readMint, tokenAmount, type MintInfo } from "./token.js";
@@ -16,7 +16,7 @@ export type ListedCollateral = {
   account: Collateral;
   /** xStock raw units in the vault. */
   vault: bigint;
-  /** The mint as the program reads it at `now`. */
+  /** The mint as the program reads it at `now`, with the corporate-action window. */
   mintInfo: MintInfo;
 };
 
@@ -58,7 +58,6 @@ const SINGLETONS = [
   CLOCK_SYSVAR,
 ];
 const collateralKeys = (mint: PublicKey) => [collateralPda(mint), mint, collateralVault(mint)];
-const symbolOf = (mint: PublicKey) => XSTOCKS.find((x) => COLLATERAL[x].mint.equals(mint));
 
 /** The program's whole state. Throws if the program isn't initialized at this RPC. */
 export async function fetchProtocol(connection: Connection, commitment: Commitment = "confirmed"): Promise<Protocol> {
@@ -81,6 +80,7 @@ export async function fetchProtocol(connection: Connection, commitment: Commitme
     more.forEach((k, i) => found.set(k.toBase58(), second[i]?.data ?? null));
   }
 
+  const p = config.params;
   const twapData = data(PDA.twap);
   const aequaMint = aequaSet ? data(config.aequa.mint) : null;
   return {
@@ -108,7 +108,7 @@ export async function fetchProtocol(connection: Connection, commitment: Commitme
       mint,
       account: decodeAccount("collateral", must(collateralPda(mint), "a collateral listing")),
       vault: tokenAmount(data(collateralVault(mint))),
-      mintInfo: readMint(must(mint, "a collateral mint"), now),
+      mintInfo: readMint(must(mint, "a collateral mint"), now, { before: p.caWindowBeforeSecs, after: p.caWindowAfterSecs }),
     })),
     aequa: aequaSet ? { mint: config.aequa.mint, tokenProgram: config.aequa.tokenProgram, decimals: config.aequa.decimals, supply: aequaMint ? mintSupply(aequaMint) : 0n } : null,
   };
@@ -182,7 +182,7 @@ export function feeFor(p: Protocol, stake: AequaStake | null, now = p.now): numb
 /** The USDq supply ceiling the spot caps set. */
 export const usdqSupplyCap = (p: Protocol) => supplyCap(p.config);
 
-/** Whether a path is open (bits of `Config.paused`). */
+/** Whether a path is open (`PATH` bits). */
 export const pathOpen = (p: Protocol, bits: number) => (p.config.paused & bits) === 0;
 
 /** The USDC mint capacity left at `now`: the hourly bucket, and the room under the supply ceiling. */
@@ -210,3 +210,52 @@ export const susdqRate = (p: Protocol, now = p.now) => (p.susdqSupply === 0n ? 1
 
 /** When the next `distribute` is due, unix seconds. */
 export const nextDistribution = (p: Protocol) => Number(p.reserve.lastDistribution) + p.config.params.distributionIntervalSecs;
+
+/** NAV as `distribute` values it, with each listing's price at 1e8 in `Protocol.collateral` order. */
+export function nav(p: Protocol, pricesE8: readonly bigint[]): bigint {
+  const spot = p.collateral.reduce((sum, c, i) => sum + xstockValue(c.vault, c.mintInfo.multiplierE12, pricesE8[i], c.mintInfo.decimals), 0n);
+  return spot + p.balances.buffer + inFlight(p.reserve) + p.reserve.report.accountValue;
+}
+
+const U64_MAX = (1n << 64n) - 1n;
+const least = (...v: bigint[]) => v.reduce((a, b) => (b < a ? b : a));
+
+/**
+ * The dollars of value a listing can take in now at `priceE8`: what its hourly bucket holds, the
+ * room under its spot cap at that price, and the room under USDq's ceiling.
+ */
+export function xstockMintRoom(p: Protocol, c: ListedCollateral, priceE8: bigint, now = p.now): bigint {
+  const bucket = bucketLevel(c.account.mintBucket.available, c.account.mintBucket.updatedAt, c.account.hourlyCap, now);
+  const spot = xstockValue(c.vault, c.mintInfo.multiplierE12, priceE8, c.mintInfo.decimals);
+  const ceiling = usdqSupplyCap(p) - p.usdqSupply;
+  const room = least(bucket, c.account.spotCap - spot, ceiling);
+  return room > 0n ? room : 0n;
+}
+
+/**
+ * What `distribute` would do at `now`, with each listing's price at 1e8 in `Protocol.collateral`
+ * order: mint the surplus above the cushion, up to the yield cap for the time since the last one,
+ * split between sUSDq, the Reserve Fund and the protocol vault; or, under supply, burn the
+ * Reserve Fund against the shortfall and carry what's left as the deficit.
+ */
+export function distributionPreview(p: Protocol, pricesE8: readonly bigint[], now = p.now) {
+  const params = p.config.params;
+  const value = nav(p, pricesE8);
+  const supply = p.usdqSupply;
+  const floor = supply + (supply * BigInt(params.cushionBps)) / BPS;
+  const nothing = { amount: 0n, toSusdq: 0n, toReserveFund: 0n, toProtocol: 0n, burned: 0n, deficit: 0n };
+  if (value > floor) {
+    const elapsed = BigInt(now) - p.reserve.lastDistribution;
+    const cap = (supply * BigInt(params.yieldCapBpsPerDay) * (elapsed > 0n ? elapsed : 0n)) / (BPS * 86_400n);
+    const amount = least(value - floor, cap, U64_MAX);
+    const target = reserveFundTarget(p.config, least(supply + amount, U64_MAX));
+    const room = target > p.balances.reserveFund ? target - p.balances.reserveFund : 0n;
+    return { nav: value, surplus: value - floor, ...nothing, amount, ...distributionSplit(amount, params.reserveFundShareBps, params.protocolShareBps, room, p.susdqSupply > 0n) };
+  }
+  if (value < supply) {
+    const burned = least(supply - value, p.balances.reserveFund);
+    return { nav: value, surplus: value - floor, ...nothing, burned, deficit: supply - value - burned };
+  }
+  return { nav: value, surplus: value - floor, ...nothing };
+}
+

@@ -1,10 +1,10 @@
-// The program's arithmetic in bigint, function for function (math.rs, state.rs), so a quote here
-// is the amount the program will pay. Amounts are raw base units; every amount paid out rounds
-// down; times are unix seconds.
+// The program's arithmetic in bigint, function for function (math.rs, state.rs, twap.rs), so a
+// quote here is the amount the program will pay. Amounts are raw base units; every amount paid
+// out rounds down; times are unix seconds.
 
-import { BPS, MULT_ONE, PRICE_ONE } from "./constants.js";
+import { BPS, LIMITS, MULT_ONE, PRICE_ONE } from "./constants.js";
 import { AequaError, ERRORS, type ErrorName } from "./errors.js";
-import type { AequaStake, Config, Params, Reserve } from "./program.js";
+import type { AequaStake, Config, Params, Reserve, Twap } from "./program.js";
 
 type Time = number | bigint;
 const U64_MAX = (1n << 64n) - 1n;
@@ -147,8 +147,8 @@ export const hedgeLive = (r: Pick<Reserve, "report">, index: number, now: Time, 
 
 export type StakeState = "empty" | "active" | "cooling" | "window";
 
-/** Where a stAEQUA position is: cooling for `cooldownSecs`, then a withdraw window (2 days), then active again. */
-export function stakeState(stake: Pick<AequaStake, "shares" | "cooldownStart">, now: Time, cooldownSecs: number, windowSecs = 2 * 86_400): StakeState {
+/** Where a stAEQUA position is: cooling for `cooldownSecs`, then a withdraw window, then active again. */
+export function stakeState(stake: Pick<AequaStake, "shares" | "cooldownStart">, now: Time, cooldownSecs: number, windowSecs: number = LIMITS.aequaWindowSecs): StakeState {
   if (stake.shares === 0n) return "empty";
   if (stake.cooldownStart === 0n) return "active";
   const opens = stake.cooldownStart + BigInt(cooldownSecs);
@@ -157,3 +157,91 @@ export function stakeState(stake: Pick<AequaStake, "shares" | "cooldownStart">, 
   if (n < opens + BigInt(windowSecs)) return "window";
   return "active";
 }
+
+/** A constant-product pool's price, quote per AEQUA in whole tokens at 1e12 (what `observe_pool` records). */
+export function poolPrice(aequaAmount: bigint, aequaDecimals: number, quoteAmount: bigint, quoteDecimals: number): bigint {
+  if (aequaAmount === 0n || quoteAmount === 0n) fail("TwapNotReady");
+  return (quoteAmount * pow10(aequaDecimals) * MULT_ONE) / (aequaAmount * pow10(quoteDecimals));
+}
+
+/**
+ * The TWAP over the last `windowSecs` (twap.rs `average`): needs an observation at or before the
+ * window's start, one from the last five minutes and ten inside the window.
+ */
+export function twapAverage(twap: Pick<Twap, "at" | "cumulative" | "lastPrice" | "head" | "count">, now: Time, windowSecs: number = LIMITS.twapWindowSecs): bigint {
+  const ring = twap.at.length;
+  const n = BigInt(now);
+  if (twap.count === 0) fail("TwapNotReady");
+  const nth = (k: number) => (twap.head + ring - 1 - k) % ring;
+  const latest = nth(0);
+  if (n - twap.at[latest] > BigInt(LIMITS.twapMaxAgeSecs)) fail("TwapNotReady");
+  const from = n - BigInt(windowSecs);
+  let inside = 0;
+  let start = -1;
+  for (let k = 0; k < twap.count; k++) {
+    const t = twap.at[nth(k)];
+    if (t > from) inside++;
+    else if (start < 0) start = nth(k);
+  }
+  if (inside < LIMITS.twapMinSamples || start < 0) fail("TwapNotReady");
+  const elapsed = n - twap.at[start] > 1n ? n - twap.at[start] : 1n;
+  const gap = n - twap.at[latest];
+  const end = twap.cumulative[latest] + twap.lastPrice * (gap > 0n ? gap : 0n);
+  return (end - twap.cumulative[start]) / elapsed;
+}
+
+/** Dollars per whole AEQUA at 1e12 for a fill of `usd` (6 decimals) against `aequa` base units (buyback.rs `fill_price`). */
+export function fillPrice(usd: bigint, aequa: bigint, decimals: number): bigint {
+  if (aequa === 0n) fail("TwapBound");
+  const v = (usd * pow10(decimals) * MULT_ONE) / (aequa * USD_ONE);
+  if (v > U128_MAX) fail("MathOverflow");
+  return v;
+}
+
+/** Dollars (6 decimals) of `aequa` base units at `priceE12` per whole AEQUA, rounded up (buyback.rs `usd_at`). */
+export function usdAt(aequa: bigint, priceE12: bigint, decimals: number): bigint {
+  const d = pow10(decimals) * MULT_ONE;
+  return u64((aequa * priceE12 * USD_ONE + d - 1n) / d);
+}
+
+/** AEQUA base units worth `usd` at `priceE12`, rounded up (deficit.rs `aequa_for_usd`). */
+export function aequaForUsd(usd: bigint, priceE12: bigint, decimals: number): bigint {
+  if (priceE12 === 0n) fail("TwapNotReady");
+  const d = priceE12 * USD_ONE;
+  return u64((usd * pow10(decimals) * MULT_ONE + d - 1n) / d);
+}
+
+/**
+ * AEQUA's dollar price at 1e12 per whole token, as `buyback`, `cover_deficit` and `sell_slashed`
+ * take it: the pool's TWAP (`twapAverage`), through the quote asset's Pyth price at 1e8 unless
+ * the quote is a dollar (`Config.aequa.quoteFeed` 0).
+ */
+export const aequaPriceUsd = (twapE12: bigint, quoteE8?: bigint) => (quoteE8 === undefined ? twapE12 : (twapE12 * quoteE8) / PRICE_ONE);
+
+/** The least AEQUA a buyback spending `usd` must bring back: its fill may be at most `boundBps` over the price. */
+export function buybackMinOut(usd: bigint, priceE12: bigint, boundBps: number, decimals: number): bigint {
+  const ceiling = (priceE12 * (BPS + BigInt(boundBps))) / BPS;
+  return (usd * pow10(decimals) * MULT_ONE) / ((ceiling + 1n) * USD_ONE) + 1n;
+}
+
+/** The least USDC a slash sale of `aequa` must raise: its fill may be at most `boundBps` under the price. */
+export function slashSaleMinOut(aequa: bigint, priceE12: bigint, boundBps: number, decimals: number): bigint {
+  const floor = (priceE12 * (BPS - BigInt(boundBps))) / BPS;
+  const d = pow10(decimals) * MULT_ONE;
+  return (floor * aequa * USD_ONE + d - 1n) / d;
+}
+
+/**
+ * A distribution's split (distribute.rs `split`): the Reserve Fund's and the protocol's parts
+ * round down and sUSDq keeps the rest; with no sUSDq outstanding its part joins the fund's, and
+ * what the fund can't take under its target goes to the protocol vault.
+ */
+export function distributionSplit(amount: bigint, fundShareBps: number, protocolShareBps: number, fundRoom: bigint, stakers: boolean) {
+  const fund = (amount * BigInt(fundShareBps)) / BPS;
+  const protocol = (amount * BigInt(protocolShareBps)) / BPS;
+  const rest = amount - fund - protocol;
+  const [toSusdq, wanted] = stakers ? [rest, fund] : [0n, fund + rest];
+  const toReserveFund = wanted < fundRoom ? wanted : fundRoom;
+  return { toSusdq, toReserveFund, toProtocol: protocol + (wanted - toReserveFund) };
+}
+
