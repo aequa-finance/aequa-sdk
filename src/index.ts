@@ -9,5 +9,8 @@ export * from "./pyth.js";
 export * from "./token.js";
 export * from "./state.js";
 export * from "./transaction.js";
+export * from "./client.js";
 export * as instructions from "./instructions/index.js";
 export type { AequaToken, Priced, Route } from "./instructions/index.js";
+export * as quote from "./quote.js";
+export type { Price } from "./quote.js";
