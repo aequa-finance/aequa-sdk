@@ -71,6 +71,8 @@ export const collateralVault = (mint: PublicKey) => at("collateral_vault", mint)
 export const transit = (mint: PublicKey, tokenProgram: PublicKey = TOKEN_2022_PROGRAM) => ata(mint, swapAuthority, tokenProgram);
 export const usdqCooldown = (owner: PublicKey) => at("susdq_cooldown", owner);
 export const aequaStake = (owner: PublicKey) => at("aequa_stake", owner);
+export const voterWeightRecord = (realm: PublicKey, aequaMint: PublicKey, owner: PublicKey) => at("voter-weight-record", realm, aequaMint, owner);
+export const maxVoterWeightRecord = (realm: PublicKey, aequaMint: PublicKey) => at("max-voter-weight-record", realm, aequaMint);
 
 /** A mint's Metaplex metadata account. */
 export const metadata = (mint: PublicKey) => find(TOKEN_METADATA_PROGRAM, "metadata", TOKEN_METADATA_PROGRAM, mint);

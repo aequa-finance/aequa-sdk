@@ -973,6 +973,99 @@
       ]
     },
     {
+      "name": "create_max_voter_weight_record",
+      "discriminator": [
+        182,
+        70,
+        243,
+        119,
+        162,
+        176,
+        38,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  120,
+                  45,
+                  118,
+                  111,
+                  116,
+                  101,
+                  114,
+                  45,
+                  119,
+                  101,
+                  105,
+                  103,
+                  104,
+                  116,
+                  45,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "realm"
+              },
+              {
+                "kind": "account",
+                "path": "config.aequa.mint",
+                "account": "Config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "realm",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "create_susdq_vaults",
       "discriminator": [
         85,
@@ -1377,6 +1470,102 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "create_voter_weight_record",
+      "discriminator": [
+        184,
+        249,
+        133,
+        178,
+        88,
+        152,
+        250,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter"
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114,
+                  45,
+                  119,
+                  101,
+                  105,
+                  103,
+                  104,
+                  116,
+                  45,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "realm"
+              },
+              {
+                "kind": "account",
+                "path": "config.aequa.mint",
+                "account": "Config"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "realm",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "distribute",
@@ -4783,6 +4972,172 @@
       "args": []
     },
     {
+      "name": "update_max_voter_weight_record",
+      "discriminator": [
+        103,
+        175,
+        201,
+        251,
+        2,
+        9,
+        251,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "aequa_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_voter_weight_record",
+      "discriminator": [
+        45,
+        185,
+        3,
+        36,
+        109,
+        190,
+        115,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "aequa_pool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true
+        },
+        {
+          "name": "aequa_stake",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "record.governing_token_owner",
+                "account": "VoterWeightRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": {
+            "option": {
+              "defined": {
+                "name": "VoterWeightAction"
+              }
+            }
+          }
+        },
+        {
+          "name": "target",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
       "name": "withdraw_aequa",
       "discriminator": [
         53,
@@ -4966,6 +5321,19 @@
       ]
     },
     {
+      "name": "MaxVoterWeightRecord",
+      "discriminator": [
+        157,
+        95,
+        242,
+        151,
+        16,
+        98,
+        26,
+        118
+      ]
+    },
+    {
       "name": "Reserve",
       "discriminator": [
         43,
@@ -5015,6 +5383,19 @@
         206,
         193,
         23
+      ]
+    },
+    {
+      "name": "VoterWeightRecord",
+      "discriminator": [
+        46,
+        249,
+        155,
+        75,
+        153,
+        248,
+        116,
+        9
       ]
     }
   ],
@@ -6524,6 +6905,41 @@
       }
     },
     {
+      "name": "MaxVoterWeightRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "realm",
+            "type": "pubkey"
+          },
+          {
+            "name": "governing_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "max_voter_weight",
+            "type": "u64"
+          },
+          {
+            "name": "max_voter_weight_expiry",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "Minted",
       "type": {
         "kind": "struct",
@@ -7248,6 +7664,84 @@
           {
             "name": "end",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoterWeightAction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "CastVote"
+          },
+          {
+            "name": "CommentProposal"
+          },
+          {
+            "name": "CreateGovernance"
+          },
+          {
+            "name": "CreateProposal"
+          },
+          {
+            "name": "SignOffProposal"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoterWeightRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "realm",
+            "type": "pubkey"
+          },
+          {
+            "name": "governing_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "governing_token_owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter_weight",
+            "type": "u64"
+          },
+          {
+            "name": "voter_weight_expiry",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "weight_action",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "VoterWeightAction"
+                }
+              }
+            }
+          },
+          {
+            "name": "weight_action_target",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           }
         ]
       }

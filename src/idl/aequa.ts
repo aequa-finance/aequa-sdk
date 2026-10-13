@@ -979,6 +979,99 @@ export type Aequa = {
       ]
     },
     {
+      "name": "createMaxVoterWeightRecord",
+      "discriminator": [
+        182,
+        70,
+        243,
+        119,
+        162,
+        176,
+        38,
+        248
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  97,
+                  120,
+                  45,
+                  118,
+                  111,
+                  116,
+                  101,
+                  114,
+                  45,
+                  119,
+                  101,
+                  105,
+                  103,
+                  104,
+                  116,
+                  45,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "realm"
+              },
+              {
+                "kind": "account",
+                "path": "config.aequa.mint",
+                "account": "config"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "realm",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
       "name": "createSusdqVaults",
       "discriminator": [
         85,
@@ -1383,6 +1476,102 @@ export type Aequa = {
         }
       ],
       "args": []
+    },
+    {
+      "name": "createVoterWeightRecord",
+      "discriminator": [
+        184,
+        249,
+        133,
+        178,
+        88,
+        152,
+        250,
+        186
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "voter"
+        },
+        {
+          "name": "record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114,
+                  45,
+                  119,
+                  101,
+                  105,
+                  103,
+                  104,
+                  116,
+                  45,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "realm"
+              },
+              {
+                "kind": "account",
+                "path": "config.aequa.mint",
+                "account": "config"
+              },
+              {
+                "kind": "account",
+                "path": "voter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "realm",
+          "type": "pubkey"
+        }
+      ]
     },
     {
       "name": "distribute",
@@ -4789,6 +4978,172 @@ export type Aequa = {
       "args": []
     },
     {
+      "name": "updateMaxVoterWeightRecord",
+      "discriminator": [
+        103,
+        175,
+        201,
+        251,
+        2,
+        9,
+        251,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "aequaPool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateVoterWeightRecord",
+      "discriminator": [
+        45,
+        185,
+        3,
+        36,
+        109,
+        190,
+        115,
+        169
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "aequaPool",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "record",
+          "writable": true
+        },
+        {
+          "name": "aequaStake",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  101,
+                  113,
+                  117,
+                  97,
+                  95,
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "record.governingTokenOwner",
+                "account": "voterWeightRecord"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": {
+            "option": {
+              "defined": {
+                "name": "voterWeightAction"
+              }
+            }
+          }
+        },
+        {
+          "name": "target",
+          "type": {
+            "option": "pubkey"
+          }
+        }
+      ]
+    },
+    {
       "name": "withdrawAequa",
       "discriminator": [
         53,
@@ -4972,6 +5327,19 @@ export type Aequa = {
       ]
     },
     {
+      "name": "maxVoterWeightRecord",
+      "discriminator": [
+        157,
+        95,
+        242,
+        151,
+        16,
+        98,
+        26,
+        118
+      ]
+    },
+    {
       "name": "reserve",
       "discriminator": [
         43,
@@ -5021,6 +5389,19 @@ export type Aequa = {
         206,
         193,
         23
+      ]
+    },
+    {
+      "name": "voterWeightRecord",
+      "discriminator": [
+        46,
+        249,
+        155,
+        75,
+        153,
+        248,
+        116,
+        9
       ]
     }
   ],
@@ -6530,6 +6911,41 @@ export type Aequa = {
       }
     },
     {
+      "name": "maxVoterWeightRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "realm",
+            "type": "pubkey"
+          },
+          {
+            "name": "governingTokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "maxVoterWeight",
+            "type": "u64"
+          },
+          {
+            "name": "maxVoterWeightExpiry",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "minted",
       "type": {
         "kind": "struct",
@@ -7254,6 +7670,84 @@ export type Aequa = {
           {
             "name": "end",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "voterWeightAction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "castVote"
+          },
+          {
+            "name": "commentProposal"
+          },
+          {
+            "name": "createGovernance"
+          },
+          {
+            "name": "createProposal"
+          },
+          {
+            "name": "signOffProposal"
+          }
+        ]
+      }
+    },
+    {
+      "name": "voterWeightRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "realm",
+            "type": "pubkey"
+          },
+          {
+            "name": "governingTokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "governingTokenOwner",
+            "type": "pubkey"
+          },
+          {
+            "name": "voterWeight",
+            "type": "u64"
+          },
+          {
+            "name": "voterWeightExpiry",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "weightAction",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "voterWeightAction"
+                }
+              }
+            }
+          },
+          {
+            "name": "weightActionTarget",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                8
+              ]
+            }
           }
         ]
       }

@@ -3,6 +3,7 @@
 
 export * from "./admin.js";
 export * from "./crank.js";
+export * from "./governance.js";
 export * from "./keeper.js";
 export type { AequaToken, Priced, Route } from "./shared.js";
 export * from "./user.js";

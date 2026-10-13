@@ -56,6 +56,8 @@ export type UsdqCooldown = Plain<A["usdqCooldown"]>;
 export type AequaPool = Plain<A["aequaPool"]>;
 export type AequaStake = Plain<A["aequaStake"]>;
 export type Twap = Plain<A["twap"]>;
+export type VoterWeightRecord = Plain<A["voterWeightRecord"]>;
+export type MaxVoterWeightRecord = Plain<A["maxVoterWeightRecord"]>;
 export type Params = Plain<T["params"]>;
 export type Bucket = Plain<T["bucket"]>;
 export type Vesting = Plain<T["vesting"]>;
@@ -66,6 +68,7 @@ export type BridgeArgs = Plain<T["bridgeArgs"]>;
 export type ReportArgs = Plain<T["reportArgs"]>;
 export type AequaArgs = Plain<T["aequaArgs"]>;
 export type TokenMetadataArgs = Plain<T["tokenMetadataArgs"]>;
+export type VoterWeightAction = T["voterWeightAction"];
 export type EventName = keyof IdlEvents<Aequa>;
 export type EventData<N extends EventName> = Plain<IdlEvents<Aequa>[N]>;
 
