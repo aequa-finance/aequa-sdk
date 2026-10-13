@@ -7,7 +7,8 @@
     "node": ">=20.18"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --import tsx test/*.test.ts"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.2.1",

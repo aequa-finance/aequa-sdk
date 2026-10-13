@@ -8,6 +8,9 @@ import { Buffer } from "buffer";
 import idl from "./idl/idl.js";
 import type { Aequa } from "./idl/aequa.js";
 
+// Anchor's encoders read `Buffer` as a global, which browsers don't have.
+(globalThis as { Buffer?: unknown }).Buffer ??= Buffer;
+
 export type { Aequa };
 /** The program's IDL as `anchor idl build` writes it. */
 export const IDL = idl as Aequa;
