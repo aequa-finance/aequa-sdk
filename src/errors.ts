@@ -23,9 +23,10 @@ export const errorName = (code: number): ErrorName | undefined => byCode.get(cod
 
 /**
  * A refusal. `code` names it: one of this program's errors (`ErrorName`), another program's
- * Anchor error, `Custom<n>` for a custom number whose program isn't known to be this one, or one
- * the SDK raises ("Expired", "TooLarge"). `program` is the program that raised it, when the
- * logs say.
+ * Anchor error, `Custom<n>` for a custom number whose program isn't known to be this one, a
+ * runtime error ("BlockhashNotFound", "InsufficientFundsForFee", …), or one the SDK raises:
+ * "Expired" (the blockhash ran out before the transaction landed), "TooLarge", "NotListed",
+ * "NoPriceSource". `program` is the program that raised it, when the logs say.
  */
 export class AequaError extends Error {
   constructor(
@@ -102,7 +103,23 @@ export function toAequaError(e: unknown): AequaError {
     const logs = e.logs ?? [];
     const f = failureFromLogs(logs);
     const custom = e.message.match(/custom program error: 0x([0-9a-f]+)/i);
-    return new AequaError(f?.code ?? (custom ? `Custom${parseInt(custom[1], 16)}` : undefined), e.message, logs, f?.program);
+    const code = f?.code ?? (custom ? `Custom${parseInt(custom[1], 16)}` : runtimeCode(e.message));
+    return new AequaError(code, e.message, logs, f?.program);
   }
-  return new AequaError(undefined, e instanceof Error ? e.message : String(e));
+  const message = e instanceof Error ? e.message : String(e);
+  return new AequaError(runtimeCode(message), message);
+}
+
+/** The runtime's errors as an RPC words them. */
+const RUNTIME: [RegExp, string][] = [
+  [/blockhash not found/i, "BlockhashNotFound"],
+  [/insufficient funds for fee/i, "InsufficientFundsForFee"],
+  [/insufficient funds for rent/i, "InsufficientFundsForRent"],
+  [/no record of a prior credit/i, "AccountNotFound"],
+  [/already been processed/i, "AlreadyProcessed"],
+  [/computational budget exceeded|exceeded CUs meter/i, "ComputationalBudgetExceeded"],
+];
+
+function runtimeCode(text: string): string | undefined {
+  return RUNTIME.find(([pattern]) => pattern.test(text))?.[1];
 }

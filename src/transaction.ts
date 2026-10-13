@@ -1,6 +1,6 @@
 // Transactions for the program: v0 messages over its lookup table, a compute budget first, a
 // priced instruction right after the ed25519 check of its update, simulated before signing, and
-// sent with a confirmation that polls the signature until the blockhash expires.
+// sent with a confirmation that polls the signature and resends until the blockhash expires.
 
 import {
   ComputeBudgetProgram,
@@ -14,6 +14,7 @@ import {
   type TransactionInstruction,
 } from "@solana/web3.js";
 import { AequaError, refusal, toAequaError } from "./errors.js";
+import { parseEvents, type AequaEvent } from "./events.js";
 import { ed25519Instruction } from "./pyth.js";
 
 /** Every transaction built here starts with these two: the compute unit limit, then its price. */
@@ -25,7 +26,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * The instructions of a priced transaction after the compute budget: `before`, the ed25519
- * check, then the instruction `build` makes for that check's index.
+ * check, then the instruction `build` makes for that check's index. Wallets keep a compute
+ * budget that is there and add their own instructions after the last one, so the index holds.
  */
 export async function withPrice(
   envelope: Uint8Array,
@@ -65,14 +67,14 @@ export function compose(o: Compose): VersionedTransaction {
   return tx;
 }
 
-export type Simulation = { units: number; logs: string[] };
+export type Simulation = { units: number; logs: string[]; events: AequaEvent[] };
 
 /** Simulates without signatures; throws an `AequaError` naming the refusal. */
 export async function simulate(connection: Connection, tx: VersionedTransaction, what = "transaction"): Promise<Simulation> {
   const sim = await connection.simulateTransaction(tx, { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed" });
   const logs = sim.value.logs ?? [];
   if (sim.value.err) throw refusal(sim.value.err, logs, what);
-  return { units: sim.value.unitsConsumed ?? 0, logs };
+  return { units: sim.value.unitsConsumed ?? 0, logs, events: parseEvents(logs) };
 }
 
 export type Prepared = { transaction: VersionedTransaction; simulation: Simulation; blockhash: { blockhash: string; lastValidBlockHeight: number } };
@@ -96,7 +98,8 @@ export async function prepare(
 /**
  * Sends a signed transaction and waits for it: the node checks it first, so a refusal comes
  * back at once with its name; then the signature is polled and the transaction resent every
- * two seconds until it lands or its blockhash expires (`Expired`).
+ * two seconds. Once its blockhash has expired it can no longer land, and its status is read
+ * through history before it is called `Expired`; a status that can't be read is `Unconfirmed`.
  */
 export async function sendAndConfirm(
   connection: Connection,
@@ -113,17 +116,67 @@ export async function sendAndConfirm(
   const want = o.commitment ?? "confirmed";
   const last = o.lastValidBlockHeight ?? (await connection.getLatestBlockhash("confirmed")).lastValidBlockHeight;
 
-  for (let i = 1; ; i++) {
-    await sleep(1_000);
-    const status = (await connection.getSignatureStatuses([signature])).value[0];
-    if (status?.err) {
+  const look = async (searchTransactionHistory: boolean): Promise<"landed" | "pending" | "absent" | "unknown"> => {
+    let status;
+    try {
+      status = (await connection.getSignatureStatuses([signature], { searchTransactionHistory })).value[0];
+    } catch {
+      return "unknown";
+    }
+    if (!status) return "absent";
+    if (status.err) {
       const t = await connection.getTransaction(signature, { maxSupportedTransactionVersion: 0, commitment: "confirmed" }).catch(() => null);
       throw refusal(status.err, t?.meta?.logMessages);
     }
-    if (status && (status.confirmationStatus === want || status.confirmationStatus === "finalized")) return signature;
+    return status.confirmationStatus === want || status.confirmationStatus === "finalized" ? "landed" : "pending";
+  };
+
+  for (let i = 1; ; i++) {
+    await sleep(1_000);
+    if ((await look(false)) === "landed") return signature;
     if (i % 2 !== 0) continue;
-    if ((await connection.getBlockHeight("confirmed")) > last) throw new AequaError("Expired", `${signature} did not land before its blockhash expired`);
-    await connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => undefined);
+    const height = await connection.getBlockHeight("confirmed").catch(() => 0);
+    if (height <= last) {
+      await connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => undefined);
+      continue;
+    }
+    // Past its blockhash's life: landed in one of the last blocks, or never will.
+    let absent = 0;
+    for (let k = 0; k < 10; k++) {
+      const seen = await look(true);
+      if (seen === "landed") return signature;
+      absent = seen === "absent" ? absent + 1 : 0;
+      if (absent >= 2) throw new AequaError("Expired", `${signature} did not land before its blockhash expired`);
+      await sleep(1_000);
+    }
+    throw new AequaError("Unconfirmed", `${signature}'s status couldn't be settled: look it up before sending the action again`);
+  }
+}
+
+/**
+ * Prepares, signs, sends and confirms what `build` returns, building again for each attempt: a
+ * transaction carrying a signed price fetches a fresh one each time. A refusal for a stale price
+ * is tried again, and so is a transaction whose blockhash expired without it landing; nothing
+ * else is. The first signer pays.
+ */
+export async function sendFresh(
+  connection: Connection,
+  o: Omit<Compose, "recentBlockhash" | "units" | "instructions" | "payer"> & {
+    signers: Signer[];
+    build: () => Promise<TransactionInstruction[]>;
+    attempts?: number;
+    label?: string;
+  },
+): Promise<string> {
+  const attempts = o.attempts ?? 3;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { transaction, blockhash } = await prepare(connection, { ...o, payer: o.signers[0].publicKey, instructions: await o.build() });
+      return sendAndConfirm(connection, transaction, { lastValidBlockHeight: blockhash.lastValidBlockHeight });
+    } catch (e) {
+      const again = e instanceof AequaError && (e.is("StalePrice") || e.code === "Expired");
+      if (!again || attempt >= attempts) throw e;
+    }
   }
 }
 

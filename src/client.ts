@@ -9,7 +9,7 @@ import * as ix from "./instructions/index.js";
 import { PDA } from "./pda.js";
 import { feedPrice, parseEnvelope, requireFresh, type PriceSource, type Update } from "./pyth.js";
 import * as quote from "./quote.js";
-import { feeFor, fetchPosition, fetchProtocol, type ListedCollateral, type Position, type Protocol } from "./state.js";
+import { feeFor, fetchPosition, fetchProtocol, positionState, type ListedCollateral, type Position, type Protocol } from "./state.js";
 import { createAtaIdempotent } from "./token.js";
 import { lookupTable, prepare, sendAndConfirm, withPrice, type Simulation } from "./transaction.js";
 
@@ -28,7 +28,7 @@ export type ClientOptions = {
 export type Built = {
   transaction: VersionedTransaction;
   simulation: Simulation;
-  /** What the action pays out, in raw units of what it pays (USDq, USDC, the xStock, sUSDq). */
+  /** What the action pays out, in raw units of what it pays (USDq, USDC, the xStock, sUSDq, AEQUA). */
   out: bigint;
   /** The fee taken, in USDq or USDC raw units (0 where there is none). */
   fee: bigint;
@@ -93,6 +93,57 @@ export class AequaClient {
     return this.finish(o.user, [...pre, stake], { out, fee: 0n }, "stake_usdq");
   }
 
+  /**
+   * Starts a cooldown for `shares` sUSDq; `out` is the USDq it locks. A cooldown that has ended
+   * is claimed first, in the same transaction.
+   */
+  async unstake(o: { user: PublicKey; shares: bigint }): Promise<Built> {
+    const p = await this.protocol();
+    const w = await this.position(o.user, p);
+    const body: TransactionInstruction[] = [];
+    const c = w.usdqCooldown;
+    if (c && c.amount > 0n && BigInt(p.now) >= c.unlockAt) body.push(...this.create(o.user, [[w.usdq.exists, PDA.usdqMint]]), await ix.claimUsdq({ user: o.user }));
+    body.push(await ix.startUsdqCooldown({ user: o.user, shares: o.shares }));
+    return this.finish(o.user, body, { out: quote.unstakeUsdq(p, o.shares), fee: 0n }, "start_usdq_cooldown");
+  }
+
+  /** Claims the USDq of a cooldown that has ended. */
+  async claim(o: { user: PublicKey }): Promise<Built> {
+    const p = await this.protocol();
+    const w = await this.position(o.user, p);
+    if (!w.usdqCooldown || w.usdqCooldown.amount === 0n) throw new AequaError("NothingToClaim", "no USDq is cooling down for this wallet");
+    const body = [...this.create(o.user, [[w.usdq.exists, PDA.usdqMint]]), await ix.claimUsdq({ user: o.user })];
+    return this.finish(o.user, body, { out: w.usdqCooldown.amount, fee: 0n }, "claim_usdq");
+  }
+
+  /** Stakes AEQUA for stAEQUA. `minShares` defaults to the quote less `slippageBps` (10). */
+  async stakeAequa(o: { user: PublicKey; amount: bigint; minShares?: bigint; slippageBps?: number }): Promise<Built> {
+    const p = await this.protocol();
+    const aequa = p.aequa ?? notSet();
+    const out = quote.stakeAequa(p, o.amount);
+    const stake = await ix.stakeAequa({ user: o.user, aequa, amount: o.amount, minShares: o.minShares ?? less(out, o.slippageBps) });
+    return this.finish(o.user, [stake], { out, fee: 0n }, "stake_aequa");
+  }
+
+  /** Starts the cooldown for the whole stAEQUA position. */
+  async unstakeAequa(o: { user: PublicKey }): Promise<Built> {
+    const p = await this.protocol();
+    const w = await this.position(o.user, p);
+    if (!w.aequaStake) throw new AequaError("NothingStaked", "this wallet has no stAEQUA position");
+    return this.finish(o.user, [await ix.startAequaUnstake({ user: o.user })], { out: 0n, fee: 0n }, "start_aequa_unstake");
+  }
+
+  /** Withdraws the position's AEQUA during its window. */
+  async withdrawAequa(o: { user: PublicKey }): Promise<Built> {
+    const p = await this.protocol();
+    const aequa = p.aequa ?? notSet();
+    const w = await this.position(o.user, p);
+    if (!w.aequaStake) throw new AequaError("NothingStaked", "this wallet has no stAEQUA position");
+    if (positionState(p, w.aequaStake) !== "window") throw new AequaError("WindowNotOpen", "the position's withdraw window isn't open");
+    const body = [...this.create(o.user, [[!!w.aequa?.exists, aequa.mint, aequa.tokenProgram]]), await ix.withdrawAequa({ user: o.user, aequa })];
+    return this.finish(o.user, body, { out: quote.withdrawAequa(p, w.aequaStake.shares), fee: 0n }, "withdraw_aequa");
+  }
+
   /** Sends a signed transaction and waits for it to land; refusals come back as `AequaError`s. */
   send(signed: VersionedTransaction, built?: Pick<Built, "lastValidBlockHeight">): Promise<string> {
     return sendAndConfirm(this.connection, signed, { lastValidBlockHeight: built?.lastValidBlockHeight, commitment: this.commitment });
@@ -146,6 +197,10 @@ export class AequaClient {
 }
 
 const less = (v: bigint, bps = 10) => (v * BigInt(10_000 - bps)) / 10_000n;
+
+const notSet = (): never => {
+  throw new AequaError("AequaNotSet", "AEQUA isn't set on the program yet");
+};
 
 /** The listing for "SPYx", "QQQx" or a mint; throws if it isn't listed. */
 export function listing(p: Protocol, asset: XStock | PublicKey): ListedCollateral {

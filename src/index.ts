@@ -8,6 +8,7 @@ export * from "./math.js";
 export * from "./pyth.js";
 export * from "./token.js";
 export * from "./state.js";
+export * from "./events.js";
 export * from "./transaction.js";
 export * from "./client.js";
 export * as instructions from "./instructions/index.js";
