@@ -41,7 +41,7 @@ export const PDA = {
   config: at("config"),
   reserve: at("reserve"),
   /** sUSDq's state (`UsdqVault`). */
-  usdqVault: at("usdq_vault"),
+  usdqVault: at("susdq_vault"),
   /** stAEQUA's state (`AequaPool`). */
   aequaPool: at("aequa_pool"),
   usdqMint: at("usdq_mint"),
