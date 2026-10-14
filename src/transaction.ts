@@ -172,7 +172,7 @@ export async function sendFresh(
   for (let attempt = 1; ; attempt++) {
     try {
       const { transaction, blockhash } = await prepare(connection, { ...o, payer: o.signers[0].publicKey, instructions: await o.build() });
-      return sendAndConfirm(connection, transaction, { lastValidBlockHeight: blockhash.lastValidBlockHeight });
+      return await sendAndConfirm(connection, transaction, { lastValidBlockHeight: blockhash.lastValidBlockHeight });
     } catch (e) {
       const again = e instanceof AequaError && (e.is("StalePrice") || e.code === "Expired");
       if (!again || attempt >= attempts) throw e;
