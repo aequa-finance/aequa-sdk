@@ -95,14 +95,18 @@ export class AequaClient {
 
   /**
    * Starts a cooldown for `shares` sUSDq; `out` is the USDq it locks. A cooldown that has ended
-   * is claimed first, in the same transaction.
+   * is claimed first, in the same transaction. One still running would take this USDq and start
+   * its clock again, so that needs `restartCooldown: true` (`CooldownActive` otherwise).
    */
-  async unstake(o: { user: PublicKey; shares: bigint }): Promise<Built> {
+  async unstake(o: { user: PublicKey; shares: bigint; restartCooldown?: boolean }): Promise<Built> {
     const p = await this.protocol();
     const w = await this.position(o.user, p);
     const body: TransactionInstruction[] = [];
     const c = w.usdqCooldown;
     if (c && c.amount > 0n && BigInt(p.now) >= c.unlockAt) body.push(...this.create(o.user, [[w.usdq.exists, PDA.usdqMint]]), await ix.claimUsdq({ user: o.user }));
+    else if (c && c.amount > 0n && !o.restartCooldown) {
+      throw new AequaError("CooldownActive", "a cooldown is running: unstaking now adds to it and starts its clock again (restartCooldown: true)");
+    }
     body.push(await ix.startUsdqCooldown({ user: o.user, shares: o.shares }));
     return this.finish(o.user, body, { out: quote.unstakeUsdq(p, o.shares), fee: 0n }, "start_usdq_cooldown");
   }

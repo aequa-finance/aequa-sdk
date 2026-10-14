@@ -2,13 +2,15 @@
   "name": "@aequa-finance/sdk",
   "version": "0.1.0",
   "private": true,
+  "description": "TypeScript kit for building on aequa",
   "type": "module",
   "engines": {
     "node": ">=20.18"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test --import tsx test/*.test.ts"
+    "test": "node --test --import tsx test/*.test.ts",
+    "test:localnet": "tsx test/localnet/run.ts"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.2.1",
