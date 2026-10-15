@@ -1,7 +1,8 @@
 // A permissionless crank: `distribute` once it is due, with every listed collateral priced and
 // the price paired with the latest hedge report. Anyone may send it; the program checks the rest.
 //
-//   RPC_URL=<rpc> KEYPAIR=<path> PYTH_PRO_KEY=<token> LOOKUP_TABLE=<the program's table> //     npx tsx examples/crank-distribute.ts
+//   RPC_URL=<rpc> KEYPAIR=<path> PYTH_PRO_KEY=<token> LOOKUP_TABLE=<the program's table> \
+//     npx tsx examples/crank-distribute.ts
 
 import { readFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";

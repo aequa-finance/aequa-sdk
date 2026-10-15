@@ -132,12 +132,13 @@ account, and returns the `TransactionInstruction` without touching the network.
 | Governance | `createVoterWeightRecord`, `updateVoterWeightRecord`, `createMaxVoterWeightRecord`, `updateMaxVoterWeightRecord` |
 
 ```ts
-import { instructions, withPrice, prepare, sendAndConfirm } from "@aequa-finance/sdk";
+import { COLLATERAL, instructions, lookupTable, prepare, pythPro, withPrice } from "@aequa-finance/sdk";
 
-const message = await prices.signed([1398]); // SPY's feed
+const message = await pythPro({ token: PYTH_PRO_KEY }).signed([COLLATERAL.SPYx.feed]);
 const ixs = await withPrice(message, (ed25519Index) =>
-  instructions.mintWithCollateral({ user, mint: SPYX, amount, minOut, message, ed25519Index }),
+  instructions.mintWithCollateral({ user, mint: COLLATERAL.SPYx.mint, amount, minOut, message, ed25519Index }),
 );
+const lookupTables = [await lookupTable(connection, LOOKUP_TABLE)];
 const { transaction, blockhash } = await prepare(connection, { payer: user, instructions: ixs, lookupTables });
 ```
 
