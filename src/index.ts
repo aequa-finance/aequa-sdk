@@ -1,4 +1,12 @@
 // @aequa-finance/sdk: build on aequa from TypeScript.
+//
+//   AequaClient        reads the protocol and a wallet, quotes, builds and simulates the user
+//                      paths, and sends what the wallet signed
+//   instructions       one builder for each of the program's 37 instructions
+//   fetchProtocol …    the state in one read, and what it says (fees, capacity, rates, NAV)
+//   quote, math        the program's arithmetic in bigint
+//   pyth               signed Pyth Pro prices for the xStock paths and the cranks
+//   parseEvents        the program's events from logs; AequaError for its refusals
 
 export * from "./constants.js";
 export * from "./pda.js";

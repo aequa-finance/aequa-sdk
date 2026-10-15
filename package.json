@@ -2,15 +2,39 @@
   "name": "@aequa-finance/sdk",
   "version": "0.1.0",
   "private": true,
-  "description": "TypeScript kit for building on aequa",
+  "description": "TypeScript kit for building on aequa: USDq, sUSDq and stAEQUA on Solana",
+  "keywords": [
+    "aequa",
+    "usdq",
+    "solana",
+    "stablecoin",
+    "anchor"
+  ],
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./dist/program.js"
+  ],
   "engines": {
     "node": ">=20.18"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test --import tsx test/*.test.ts",
-    "test:localnet": "tsx test/localnet/run.ts"
+    "test:localnet": "tsx test/localnet/run.ts",
+    "prepack": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "@anchor-lang/core": "^1.2.1",
