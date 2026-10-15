@@ -5,6 +5,7 @@
 //   instructions       one builder for each of the program's 37 instructions
 //   fetchProtocol …    the state in one read, and what it says (fees, capacity, rates, NAV)
 //   quote, math        the program's arithmetic in bigint
+//   parseUnits …       decimal strings to raw units and back, exactly
 //   pyth               signed Pyth Pro prices for the xStock paths and the cranks
 //   parseEvents        the program's events from logs; AequaError for its refusals
 
@@ -13,6 +14,7 @@ export * from "./pda.js";
 export * from "./program.js";
 export * from "./errors.js";
 export * from "./math.js";
+export * from "./units.js";
 export * from "./pyth.js";
 export * from "./token.js";
 export * from "./state.js";
