@@ -8,8 +8,8 @@ export function parseUnits(text: string, decimals: number): bigint {
   const m = text.trim().match(AMOUNT);
   if (!m || !(m[1] || m[2])) throw new Error(`not an amount: ${JSON.stringify(text)}`);
   const [, whole, fraction = ""] = m;
-  if (fraction.length > decimals) throw new Error(`${text.trim()} has more than ${decimals} decimals`);
-  return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0") || "0");
+  if (/[1-9]/.test(fraction.slice(decimals))) throw new Error(`${text.trim()} has more than ${decimals} decimals`);
+  return BigInt(whole || "0") * 10n ** BigInt(decimals) + BigInt(fraction.slice(0, decimals).padEnd(decimals, "0") || "0");
 }
 
 /** Raw units at `decimals` as a decimal string, every digit kept and trailing zeros dropped ("1250.5"). */

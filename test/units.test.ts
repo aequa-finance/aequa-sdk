@@ -10,6 +10,7 @@ test("parses what people type, exactly", () => {
   assert.equal(parseUnits(".5", 6), 500_000n);
   assert.equal(parseUnits("7.", 6), 7_000_000n);
   assert.equal(parseUnits(" 42 ", 8), 4_200_000_000n);
+  assert.equal(parseUnits("1.50000000", 6), 1_500_000n, "zeros past the precision change nothing");
   assert.equal(parseUnits("18446744073709.551615", 6), (1n << 64n) - 1n, "no floating point on the way");
   assert.equal(parseUnits("3", 0), 3n);
 });
