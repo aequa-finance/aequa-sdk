@@ -14,7 +14,9 @@ export function parseUnits(text: string, decimals: number): bigint {
 
 /** Raw units at `decimals` as a decimal string, every digit kept and trailing zeros dropped ("1250.5"). */
 export function formatUnits(raw: bigint, decimals: number): string {
+  const sign = raw < 0n ? "-" : "";
+  const v = raw < 0n ? -raw : raw;
   const one = 10n ** BigInt(decimals);
-  const fraction = (raw % one).toString().padStart(decimals, "0").replace(/0+$/, "");
-  return `${raw / one}${fraction ? `.${fraction}` : ""}`;
+  const fraction = (v % one).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return `${sign}${v / one}${fraction ? `.${fraction}` : ""}`;
 }
