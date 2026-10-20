@@ -97,9 +97,8 @@ export async function prepare(
 
 /**
  * Sends a signed transaction and waits for it: the node checks it first, so a refusal comes
- * back at once with its name; then the signature is polled and the transaction resent every
- * two seconds. Once its blockhash has expired it can no longer land, and its status is read
- * through history before it is called `Expired`; a status that can't be read is `Unconfirmed`.
+ * back at once with its name; then `confirmSignature` waits for it, resending it every two
+ * seconds while its blockhash lives.
  */
 export async function sendAndConfirm(
   connection: Connection,
@@ -113,6 +112,21 @@ export async function sendAndConfirm(
   } catch (e) {
     throw toAequaError(e);
   }
+  return confirmSignature(connection, signature, { lastValidBlockHeight: o.lastValidBlockHeight, commitment: o.commitment, resend: raw });
+}
+
+/**
+ * Waits for a transaction already sent, here or by a wallet that sends itself: the signature
+ * is polled every second and `resend`, its signed bytes when they are at hand, sent again every
+ * two. Once its blockhash has expired it can no longer land, and its status is read through
+ * history before it is called `Expired`; a status that can't be read is `Unconfirmed`. A
+ * transaction that failed on chain comes back as an `AequaError` naming the refusal.
+ */
+export async function confirmSignature(
+  connection: Connection,
+  signature: string,
+  o: { lastValidBlockHeight?: number; commitment?: Commitment; resend?: Uint8Array } = {},
+): Promise<string> {
   const want = o.commitment ?? "confirmed";
   const last = o.lastValidBlockHeight ?? (await connection.getLatestBlockhash("confirmed")).lastValidBlockHeight;
 
@@ -137,7 +151,7 @@ export async function sendAndConfirm(
     if (i % 2 !== 0) continue;
     const height = await connection.getBlockHeight("confirmed").catch(() => 0);
     if (height <= last) {
-      await connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => undefined);
+      if (o.resend) await connection.sendRawTransaction(o.resend, { skipPreflight: true, maxRetries: 0 }).catch(() => undefined);
       continue;
     }
     // Past its blockhash's life: landed in one of the last blocks, or never will.

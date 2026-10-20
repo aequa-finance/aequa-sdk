@@ -1,11 +1,11 @@
 // Composing, sending and retrying, against an RPC scripted here: a landing, a refusal, an expiry,
-// a landing seen only after the blockhash expired, an RPC that can't answer, and fresh builds
-// after a stale price.
+// a landing seen only after the blockhash expired, an RPC that can't answer, a transaction a
+// wallet sent itself, and fresh builds after a stale price.
 
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { AddressLookupTableAccount, Keypair, PublicKey, type Connection, type SignatureStatus } from "@solana/web3.js";
-import { AequaError, compose, COLLATERAL, instructions, lookupTableAddresses, PROGRAM_ID, sendAndConfirm, sendFresh, withPrice } from "../src/index.js";
+import { AequaError, compose, COLLATERAL, confirmSignature, instructions, lookupTableAddresses, PROGRAM_ID, sendAndConfirm, sendFresh, withPrice } from "../src/index.js";
 
 const payer = Keypair.generate();
 const blockhash = "4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM";
@@ -119,4 +119,10 @@ test("sendFresh builds again after a stale price, and only then", async (t) => {
     (e) => e instanceof AequaError && e.is("Paused"),
   );
   assert.equal(builds, 1, "a refusal other than a stale price isn't retried");
+});
+
+test("a transaction the wallet sent itself is waited for, never sent again", async (t) => {
+  const { connection, sends } = rpc({ status: (_, call) => (call < 4 ? null : confirmed) });
+  assert.equal(await drive(t, () => confirmSignature(connection, "sig", { lastValidBlockHeight: 100 })), "sig");
+  assert.equal(sends.length, 0);
 });
