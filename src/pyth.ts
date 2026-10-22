@@ -5,6 +5,7 @@
 import { TransactionInstruction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 import { ED25519_PROGRAM, PYTH, SESSION } from "./constants.js";
+import { AequaError } from "./errors.js";
 import { fail, priceE8 } from "./math.js";
 
 const ENVELOPE_MAGIC = 2_182_742_457;
@@ -143,27 +144,32 @@ export interface PriceSource {
   signed(feeds: number[]): Promise<Uint8Array>;
 }
 
-/** Pyth Pro's REST endpoint under an access token (one with the US equity feeds). */
+/** Pyth Pro's REST endpoint under an access token (one with the US equity feeds); `PriceUnavailable` when it fails. */
 export function pythPro(o: { token: string; url?: string }): PriceSource {
   const url = (o.url ?? "https://pyth-lazer.dourolabs.app").replace(/\/$/, "");
   return {
     async signed(feeds) {
-      const res = await fetch(`${url}/v1/latest_price`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${o.token}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          priceFeedIds: feeds,
-          properties: ["price", "exponent", "confidence", "feedUpdateTimestamp", "marketSession"],
-          formats: ["solana"],
-          channel: PYTH.channel,
-          jsonBinaryEncoding: "base64",
-          parsed: false,
-        }),
-        signal: AbortSignal.timeout(10_000),
-      });
-      if (!res.ok) throw new Error(`Pyth Pro answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const body = (await res.json()) as { solana?: { data?: string } };
-      if (!body.solana?.data) throw new Error("Pyth Pro sent no solana payload");
+      let res: Response;
+      try {
+        res = await fetch(`${url}/v1/latest_price`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${o.token}`, "content-type": "application/json" },
+          body: JSON.stringify({
+            priceFeedIds: feeds,
+            properties: ["price", "exponent", "confidence", "feedUpdateTimestamp", "marketSession"],
+            formats: ["solana"],
+            channel: PYTH.channel,
+            jsonBinaryEncoding: "base64",
+            parsed: false,
+          }),
+          signal: AbortSignal.timeout(10_000),
+        });
+      } catch (e) {
+        throw new AequaError("PriceUnavailable", `Pyth Pro didn't answer: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      if (!res.ok) throw new AequaError("PriceUnavailable", `Pyth Pro answered ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+      const body = (await res.json().catch(() => ({}))) as { solana?: { data?: string } };
+      if (!body.solana?.data) throw new AequaError("PriceUnavailable", "Pyth Pro sent no solana payload");
       return Uint8Array.from(Buffer.from(body.solana.data, "base64"));
     },
   };

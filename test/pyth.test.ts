@@ -1,11 +1,12 @@
-// Signed Pyth Pro updates read as the program reads them (pyth.rs tests), and the ed25519 check
-// pointing at the right bytes of a real signature inside a built instruction.
+// Signed Pyth Pro updates read as the program reads them (pyth.rs tests), the ed25519 check
+// pointing at the right bytes of a real signature inside a built instruction, and Pyth Pro's
+// endpoint as `pythPro` asks it, against a fetch scripted here.
 
 import assert from "node:assert/strict";
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { test } from "node:test";
 import { Keypair } from "@solana/web3.js";
-import { AequaError, COLLATERAL, ED25519_PROGRAM, ed25519Instruction, feedPrice, instructions, isLive, parseEnvelope, requireFresh, withPrice } from "../src/index.js";
+import { AequaError, COLLATERAL, ED25519_PROGRAM, ed25519Instruction, feedPrice, instructions, isLive, parseEnvelope, PYTH, pythPro, requireFresh, withPrice } from "../src/index.js";
 import { envelope, payload } from "./helpers.js";
 
 const refuses = (f: () => unknown, code: string) => assert.throws(f, (e) => e instanceof AequaError && e.code === code);
@@ -80,4 +81,24 @@ test("the ed25519 check covers the signature, signer and payload inside the pric
   assert.ok(verify(null, msg, createPublicKey({ key: spki, format: "der", type: "spki" }), sig), "the bytes the check reads verify");
   assert.deepEqual(Uint8Array.from(msg), body);
   assert.equal(ed25519Instruction(signed, 9).data.readUInt16LE(16 - 2), 9);
+});
+
+test("pythPro asks for the feeds on the program's channel, and names a failure", async (t) => {
+  const update = envelope(payload(ts, 3, [{ id: 1398, price: 66_512_340n, session: 0, updatedUs: ts }]));
+  const answers = [
+    () => new Response(JSON.stringify({ solana: { data: Buffer.from(update).toString("base64") } })),
+    () => new Response("unauthorized", { status: 401 }),
+    () => new Response("{}"),
+    () => {
+      throw new TypeError("fetch failed");
+    },
+  ];
+  let asked: { priceFeedIds?: number[]; channel?: string } = {};
+  t.mock.method(globalThis, "fetch", async (_: unknown, init?: RequestInit) => ((asked = JSON.parse(String(init?.body))), answers.shift()!()));
+  const prices = pythPro({ token: "token" });
+  assert.deepEqual(await prices.signed([1398]), update);
+  assert.deepEqual([asked.priceFeedIds, asked.channel], [[1398], PYTH.channel]);
+  for (const why of [/answered 401: unauthorized/, /no solana payload/, /didn't answer: fetch failed/]) {
+    await assert.rejects(prices.signed([1398]), (e) => e instanceof AequaError && e.code === "PriceUnavailable" && why.test(e.message));
+  }
 });

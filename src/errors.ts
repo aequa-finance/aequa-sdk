@@ -25,10 +25,10 @@ export const errorName = (code: number): ErrorName | undefined => byCode.get(cod
  * The refusals the SDK raises itself: `Expired` (the blockhash ran out before the transaction
  * landed; sending again is safe), `Unconfirmed` (its status couldn't be read after that; look it
  * up before sending again), `TooLarge` (it doesn't fit without the program's lookup table),
- * `NotListed`, `NoPriceSource`, `NotInitialized` (the program isn't set up at this RPC) and
- * `NoLookupTable`.
+ * `NotListed`, `NoPriceSource`, `PriceUnavailable` (the price source sent no signed update),
+ * `NotInitialized` (the program isn't set up at this RPC) and `NoLookupTable`.
  */
-export type SdkErrorCode = "Expired" | "Unconfirmed" | "TooLarge" | "NotListed" | "NoPriceSource" | "NotInitialized" | "NoLookupTable";
+export type SdkErrorCode = "Expired" | "Unconfirmed" | "TooLarge" | "NotListed" | "NoPriceSource" | "PriceUnavailable" | "NotInitialized" | "NoLookupTable";
 
 /**
  * A refusal. `code` names it: one of this program's errors (`ErrorName`), another program's
