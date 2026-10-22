@@ -4,6 +4,7 @@
 
 import { PublicKey, type Commitment, type Connection } from "@solana/web3.js";
 import { BPS, CLOCK_SYSVAR, COLLATERAL, symbolOf, TOKEN_PROGRAM, USDC_MINT, XSTOCKS, type XStock } from "./constants.js";
+import { AequaError } from "./errors.js";
 import { assetsFor, assetsForUp, bucketLevel, distributionSplit, feeBps, hedgeLive, inFlight, reportFresh, reserveFundTarget, stakeState, supplyCap, vested, xstockValue, type StakeState } from "./math.js";
 import { aequaStake, ata, collateralPda, collateralVault, PDA, usdqCooldown } from "./pda.js";
 import { decodeAccount, type AequaPool, type AequaStake, type Collateral, type Config, type Reserve, type Twap, type UsdqCooldown, type UsdqVault } from "./program.js";
@@ -59,7 +60,7 @@ const SINGLETONS = [
 ];
 const collateralKeys = (mint: PublicKey) => [collateralPda(mint), mint, collateralVault(mint)];
 
-/** The program's whole state. Throws if the program isn't initialized at this RPC. */
+/** The program's whole state. `NotInitialized` if the program isn't set up at this RPC. */
 export async function fetchProtocol(connection: Connection, commitment: Commitment = "confirmed"): Promise<Protocol> {
   // The launch listings ride along in the first read; anything listed later takes a second.
   const known = XSTOCKS.map((x) => COLLATERAL[x].mint);
@@ -115,7 +116,7 @@ export async function fetchProtocol(connection: Connection, commitment: Commitme
 }
 
 function missing(what: string, key: PublicKey): never {
-  throw new Error(`${what} (${key.toBase58()}) doesn't exist at this RPC: the program isn't set up there`);
+  throw new AequaError("NotInitialized", `${what} (${key.toBase58()}) doesn't exist at this RPC: the program isn't set up there`);
 }
 
 /** A token account and its balance; `exists` false means an instruction paying into it creates it first. */

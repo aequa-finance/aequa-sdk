@@ -1,10 +1,23 @@
 // What a protocol read says: fees, capacity, rates and the next distribution, on a state built
-// here, so each figure can be worked out by hand.
+// here, so each figure can be worked out by hand; and a read where the program isn't set up.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { PublicKey } from "@solana/web3.js";
-import { COLLATERAL, distributionPreview, feeFor, positionState, susdqRate, usdcMintRoom, xstockMintRoom, type AequaStake, type ListedCollateral, type Protocol } from "../src/index.js";
+import { PublicKey, type Connection } from "@solana/web3.js";
+import {
+  AequaError,
+  COLLATERAL,
+  distributionPreview,
+  feeFor,
+  fetchProtocol,
+  positionState,
+  susdqRate,
+  usdcMintRoom,
+  xstockMintRoom,
+  type AequaStake,
+  type ListedCollateral,
+  type Protocol,
+} from "../src/index.js";
 import { launchParams } from "./helpers.js";
 
 const USD = 1_000_000n;
@@ -86,4 +99,9 @@ test("a shortfall burns the Reserve Fund and carries the rest", () => {
   assert.deepEqual([d.amount, d.burned, d.deficit], [0n, 3_000n * USD, 7_000n * USD]);
   const between = distributionPreview(protocol({ buffer: 1_001_000n * USD }), [68_000_000_000n]);
   assert.deepEqual([between.amount, between.burned, between.deficit], [0n, 0n, 0n], "inside the cushion nothing moves");
+});
+
+test("an RPC where the program isn't set up is named", async () => {
+  const connection = { getMultipleAccountsInfoAndContext: async (keys: PublicKey[]) => ({ context: { slot: 1 }, value: keys.map(() => null) }) } as unknown as Connection;
+  await assert.rejects(fetchProtocol(connection), (e) => e instanceof AequaError && e.code === "NotInitialized");
 });

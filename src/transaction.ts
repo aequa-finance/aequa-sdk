@@ -197,6 +197,6 @@ export async function sendFresh(
 /** A lookup table's current contents. */
 export async function lookupTable(connection: Connection, address: PublicKey): Promise<AddressLookupTableAccount> {
   const res = await connection.getAddressLookupTable(address);
-  if (!res.value) throw new Error(`no lookup table at ${address.toBase58()}`);
+  if (!res.value) throw new AequaError("NoLookupTable", `no lookup table at ${address.toBase58()}`);
   return res.value;
 }

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
 import { AddressLookupTableAccount, Keypair, PublicKey, type Connection, type SignatureStatus } from "@solana/web3.js";
-import { AequaError, compose, COLLATERAL, confirmSignature, instructions, lookupTableAddresses, PROGRAM_ID, sendAndConfirm, sendFresh, withPrice } from "../src/index.js";
+import { AequaError, compose, COLLATERAL, confirmSignature, instructions, lookupTable, lookupTableAddresses, PROGRAM_ID, sendAndConfirm, sendFresh, withPrice } from "../src/index.js";
 
 const payer = Keypair.generate();
 const blockhash = "4uQeVj5tqViQh7yWWGStvkEG1Zmhx6uasJtWCJziofM";
@@ -131,4 +131,9 @@ test("a transaction the wallet sent itself is waited for, never sent again", asy
     drive(t, () => confirmSignature(refused.connection, "sig")),
     (e) => e instanceof AequaError && e.is("StalePrice"),
   );
+});
+
+test("a lookup table that isn't there is named", async () => {
+  const connection = { getAddressLookupTable: async () => ({ context: { slot: 1 }, value: null }) } as unknown as Connection;
+  await assert.rejects(lookupTable(connection, Keypair.generate().publicKey), (e) => e instanceof AequaError && e.code === "NoLookupTable");
 });

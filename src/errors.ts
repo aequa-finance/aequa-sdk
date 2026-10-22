@@ -22,15 +22,23 @@ const byCode = new Map<number, ErrorName>(Object.entries(ERRORS).map(([name, e])
 export const errorName = (code: number): ErrorName | undefined => byCode.get(code);
 
 /**
+ * The refusals the SDK raises itself: `Expired` (the blockhash ran out before the transaction
+ * landed; sending again is safe), `Unconfirmed` (its status couldn't be read after that; look it
+ * up before sending again), `TooLarge` (it doesn't fit without the program's lookup table),
+ * `NotListed`, `NoPriceSource`, `NotInitialized` (the program isn't set up at this RPC) and
+ * `NoLookupTable`.
+ */
+export type SdkErrorCode = "Expired" | "Unconfirmed" | "TooLarge" | "NotListed" | "NoPriceSource" | "NotInitialized" | "NoLookupTable";
+
+/**
  * A refusal. `code` names it: one of this program's errors (`ErrorName`), another program's
  * Anchor error, `Custom<n>` for a custom number whose program isn't known to be this one, a
- * runtime error ("BlockhashNotFound", "InsufficientFundsForFee", …), or one the SDK raises:
- * "Expired" (the blockhash ran out before the transaction landed), "TooLarge", "NotListed",
- * "NoPriceSource". `program` is the program that raised it, when the logs say.
+ * runtime error ("BlockhashNotFound", "InsufficientFundsForFee", …), or one the SDK raises
+ * (`SdkErrorCode`). `program` is the program that raised it, when the logs say.
  */
 export class AequaError extends Error {
   constructor(
-    readonly code: ErrorName | (string & {}) | undefined,
+    readonly code: ErrorName | SdkErrorCode | (string & {}) | undefined,
     message: string,
     readonly logs: string[] = [],
     readonly program?: string,
