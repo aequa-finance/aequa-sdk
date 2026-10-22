@@ -7,12 +7,13 @@ builds each of its 37 instructions, and lays out, simulates and sends the transa
 in. Program `9xhUvFQy1yAnyuZTygfK1nD6naicXQoWMR6doxFxuTbL`, Anchor 1.2.1.
 
 ```bash
-npm install @aequa-finance/sdk @solana/web3.js
+npm install https://aequa.finance/sdk/aequa-finance-sdk-0.1.0.tgz @solana/web3.js
 ```
 
-ESM with type declarations, for Node 20.18 or later and for browsers through a bundler; it
-uses nothing of Node's. It targets the program on mainnet: mainnet's USDC, xStocks, Pyth Pro,
-CCTP and Jupiter.
+The package is served from aequa.finance rather than the npm registry, and imports as
+`@aequa-finance/sdk`. ESM with type declarations, for Node 20.18 or later and for browsers
+through a bundler; it uses nothing of Node's. It targets the program on mainnet: mainnet's USDC,
+xStocks, Pyth Pro, CCTP and Jupiter.
 
 ## Quickstart
 
