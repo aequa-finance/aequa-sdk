@@ -125,4 +125,10 @@ test("a transaction the wallet sent itself is waited for, never sent again", asy
   const { connection, sends } = rpc({ status: (_, call) => (call < 4 ? null : confirmed) });
   assert.equal(await drive(t, () => confirmSignature(connection, "sig", { lastValidBlockHeight: 100 })), "sig");
   assert.equal(sends.length, 0);
+
+  const refused = rpc({ status: () => ({ confirmationStatus: "confirmed", err: { InstructionError: [2, { Custom: 6013 }] } }), logs: stale });
+  await assert.rejects(
+    drive(t, () => confirmSignature(refused.connection, "sig")),
+    (e) => e instanceof AequaError && e.is("StalePrice"),
+  );
 });

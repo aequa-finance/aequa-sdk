@@ -63,6 +63,7 @@ seconds unless a name says milliseconds.
 | `claim({ user })` | The USDq of an ended cooldown |
 | `stakeAequa`, `unstakeAequa`, `withdrawAequa` | The stAEQUA position |
 | `send(signed, built?)` | Sends, then polls and resends until it lands or its blockhash expires |
+| `confirm(signature, built?)` | Waits the same way for a transaction the wallet sent itself (`signAndSendTransaction`) |
 
 Each action returns a `Built`: the unsigned `transaction`, its `simulation` (compute units, logs,
 the events it emitted), `out` and `fee` in raw units, and on the xStock paths `expiresAt`, the
@@ -159,6 +160,7 @@ and add their own instructions after the last one, so the index holds through si
 | `simulate` | Units, logs and events, or an `AequaError` naming the refusal |
 | `prepare` | Simulates, sets the compute units from it, optionally signs |
 | `sendAndConfirm` | Sends with the node's check first, then polls and resends until it lands |
+| `confirmSignature` | Waits for a transaction sent elsewhere, a wallet's own send: polls, reads history past the expiry, names a refusal |
 | `sendFresh` | Builds again for each attempt: a fresh price after a `StalePrice`, a fresh blockhash after an expiry |
 | `lookupTableAddresses(listing?)` | Every address the program's transactions reuse: the lookup table's contents, for the launch listing or the one given |
 

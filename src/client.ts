@@ -1,6 +1,6 @@
 // The user paths end to end: read the state, quote, build the transaction with any token account
 // it pays into, carry a fresh signed price on the xStock paths, and simulate. The wallet signs
-// what comes back; `send` lands it.
+// what comes back; `send` lands it, or `confirm` waits for it when the wallet sends it itself.
 
 import type { AddressLookupTableAccount, Commitment, Connection, PublicKey, TransactionInstruction, VersionedTransaction } from "@solana/web3.js";
 import { COLLATERAL, TOKEN_PROGRAM, USDC_MINT, type XStock } from "./constants.js";
@@ -11,7 +11,7 @@ import { feedPrice, parseEnvelope, requireFresh, type PriceSource, type Update }
 import * as quote from "./quote.js";
 import { feeFor, fetchPosition, fetchProtocol, positionState, type ListedCollateral, type Position, type Protocol } from "./state.js";
 import { createAtaIdempotent } from "./token.js";
-import { lookupTable, prepare, sendAndConfirm, withPrice, type Simulation } from "./transaction.js";
+import { confirmSignature, lookupTable, prepare, sendAndConfirm, withPrice, type Simulation } from "./transaction.js";
 
 export type ClientOptions = {
   connection: Connection;
@@ -151,6 +151,11 @@ export class AequaClient {
   /** Sends a signed transaction and waits for it to land; refusals come back as `AequaError`s. */
   send(signed: VersionedTransaction, built?: Pick<Built, "lastValidBlockHeight">): Promise<string> {
     return sendAndConfirm(this.connection, signed, { lastValidBlockHeight: built?.lastValidBlockHeight, commitment: this.commitment });
+  }
+
+  /** Waits for a transaction the wallet sent itself (`signAndSendTransaction`) to land, as `send` does. */
+  confirm(signature: string, built?: Pick<Built, "lastValidBlockHeight">): Promise<string> {
+    return confirmSignature(this.connection, signature, { lastValidBlockHeight: built?.lastValidBlockHeight, commitment: this.commitment });
   }
 
   private async convert(kind: "mint" | "redeem", o: { user: PublicKey; asset: Asset; amount: bigint; minOut?: bigint }): Promise<Built> {
