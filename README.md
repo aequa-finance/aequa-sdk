@@ -36,8 +36,9 @@ const signature = await client.send(signed, built);
 ```
 
 Amounts are `bigint` base units everywhere: USDC, USDq and sUSDq carry 6 decimals, the xStocks
-8, AEQUA its mint's. Prices are dollars at 1e8, ScaledUiAmount multipliers at 1e12, times unix
-seconds unless a name says milliseconds.
+8, AEQUA its mint's. `parseUnits("1250.5", 6)` and `formatUnits(raw, 6)` turn typed decimals
+into base units and back, exactly. Prices are dollars at 1e8, ScaledUiAmount multipliers at
+1e12, times unix seconds unless a name says milliseconds.
 
 ## How aequa works, for a builder
 
@@ -161,7 +162,7 @@ and add their own instructions after the last one, so the index holds through si
 | `prepare` | Simulates, sets the compute units from it, optionally signs |
 | `sendAndConfirm` | Sends with the node's check first, then polls and resends until it lands |
 | `confirmSignature` | Waits for a transaction sent elsewhere, a wallet's own send: polls, reads history past the expiry, names a refusal |
-| `sendFresh` | Builds again for each attempt: a fresh price after a `StalePrice`, a fresh blockhash after an expiry |
+| `sendFresh` | Builds again for each attempt: a fresh price after a `StalePrice`, a fresh blockhash after an expiry or a `BlockhashNotFound` |
 | `lookupTableAddresses(listing?)` | Every address the program's transactions reuse: the lookup table's contents, for the launch listing or the one given |
 
 ## Prices
@@ -179,7 +180,7 @@ A refusal is an `AequaError` with the logs and a `code`: the program's error nam
 show the program raised it; another program's error name, with that program in `program`, when
 it came from one it calls (Pyth Lazer, Jupiter, CCTP); `Custom<n>` when only a number is known
 (`errorName(n)` reads it as this program's); a runtime error (`BlockhashNotFound`,
-`InsufficientFundsForFee`, …); or one the SDK raises:
+`InsufficientFundsForFee`, …); or one the SDK raises (`SdkErrorCode`):
 
 | Code | When |
 |---|---|
@@ -188,6 +189,13 @@ it came from one it calls (Pyth Lazer, Jupiter, CCTP); `Custom<n>` when only a n
 | `TooLarge` | It doesn't fit in a transaction; the program's lookup table makes room |
 | `NotListed` | The asset isn't listed |
 | `NoPriceSource` | An xStock path without a `PriceSource` |
+| `PriceUnavailable` | Pyth Pro didn't answer with a signed update (`pythPro`) |
+| `NotInitialized` | The program's accounts aren't at this RPC: it isn't deployed or set up there |
+| `NoLookupTable` | No lookup table at the address given |
+
+`AequaClient` also checks a few of the program's conditions before it builds, and raises them by
+the program's own names: `CooldownActive`, `NothingToClaim`, `NothingStaked`, `WindowNotOpen`
+and `AequaNotSet`.
 
 `err.is("StalePrice")` checks for one of the program's own; `ERRORS` maps each name to its number
 and message:
@@ -297,7 +305,7 @@ The max voter weight is the whole stAEQUA pool. See `examples/vote-weight.ts`.
 ## Development
 
 ```bash
-npm test               # unit: builders against the IDL, arithmetic, prices, mints, sending, a browser bundle
+npm test               # unit: builders against the IDL, arithmetic, units, prices, mints, sending, a browser bundle
 npm run test:localnet  # the SDK end to end on a local validator
 npm run build          # dist/
 ```
@@ -306,7 +314,8 @@ The unit suite checks each of the 37 builders against the IDL: its discriminator
 in order with its signer and writable flags, fixed addresses, and the PDAs re-derived from the
 IDL's own seeds. The arithmetic runs against the program's test vectors, the Pyth reader against
 real Ed25519 signatures, the mint reader against mainnet's SPYx, QQQx and USDC mints; sending,
-expiry and retries against a scripted RPC; and a browser bundle runs with no global Buffer.
+confirming, expiry and retries against a scripted RPC; and a browser bundle runs with no global
+Buffer.
 
 The localnet run starts `solana-test-validator` in WSL with the program as built and mainnet's
 own Token, Token-2022, ATA, Pyth Lazer, Metaplex, CCTP V2, Jupiter and Raydium CLMM programs and
