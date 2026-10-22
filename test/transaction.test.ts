@@ -1,6 +1,6 @@
 // Composing, sending and retrying, against an RPC scripted here: a landing, a refusal, an expiry,
 // a landing seen only after the blockhash expired, an RPC that can't answer, a transaction a
-// wallet sent itself, and fresh builds after a stale price.
+// wallet sent itself, and fresh builds after a stale price or an unknown blockhash.
 
 import assert from "node:assert/strict";
 import { test, type TestContext } from "node:test";
@@ -131,6 +131,22 @@ test("a transaction the wallet sent itself is waited for, never sent again", asy
     drive(t, () => confirmSignature(refused.connection, "sig")),
     (e) => e instanceof AequaError && e.is("StalePrice"),
   );
+});
+
+test("sendFresh builds again when the node doesn't know the blockhash yet", async (t) => {
+  let builds = 0;
+  let sent = 0;
+  const { connection } = rpc({ status: () => confirmed });
+  Object.assign(connection, {
+    simulateTransaction: async () => ({ context: { slot: 1 }, value: { err: null, logs: [], unitsConsumed: 10_000 } }),
+    sendRawTransaction: async () => {
+      if (++sent === 1) throw new Error("failed to send transaction: Transaction simulation failed: Blockhash not found");
+      return "sig";
+    },
+  });
+  const build = async () => (builds++, [await instructions.landUsdc()]);
+  assert.equal(await drive(t, () => sendFresh(connection, { signers: [payer], build })), "sig");
+  assert.equal(builds, 2);
 });
 
 test("a lookup table that isn't there is named", async () => {

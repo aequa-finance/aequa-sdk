@@ -170,8 +170,8 @@ export async function confirmSignature(
 /**
  * Prepares, signs, sends and confirms what `build` returns, building again for each attempt: a
  * transaction carrying a signed price fetches a fresh one each time. A refusal for a stale price
- * is tried again, and so is a transaction whose blockhash expired without it landing; nothing
- * else is. The first signer pays.
+ * is tried again, and so is a transaction whose blockhash expired without it landing or that the
+ * node didn't know the blockhash of yet; nothing else is. The first signer pays.
  */
 export async function sendFresh(
   connection: Connection,
@@ -188,7 +188,7 @@ export async function sendFresh(
       const { transaction, blockhash } = await prepare(connection, { ...o, payer: o.signers[0].publicKey, instructions: await o.build() });
       return await sendAndConfirm(connection, transaction, { lastValidBlockHeight: blockhash.lastValidBlockHeight });
     } catch (e) {
-      const again = e instanceof AequaError && (e.is("StalePrice") || e.code === "Expired");
+      const again = e instanceof AequaError && (e.is("StalePrice") || e.code === "Expired" || e.code === "BlockhashNotFound");
       if (!again || attempt >= attempts) throw e;
     }
   }
